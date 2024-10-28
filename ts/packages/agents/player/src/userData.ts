@@ -12,12 +12,14 @@ import {
 import { SpotifyService } from "./service.js";
 import registerDebug from "debug";
 import { Storage } from "@typeagent/agent-sdk";
+import { NormalizedEmbedding } from "typeagent";
 
 const debugSpotify = registerDebug("typeagent:spotify");
 
 export interface MusicItemInfo {
     id: string;
     name: string;
+    embedding?: NormalizedEmbedding;
     freq: number;
     timestamps: string[];
     albumName?: string;
@@ -26,6 +28,8 @@ export interface MusicItemInfo {
 
 export interface SpotifyUserData {
     lastUpdated: number;
+
+    // spotify id to item info
     tracks: Map<string, MusicItemInfo>;
     artists: Map<string, MusicItemInfo>;
     albums: Map<string, MusicItemInfo>;
@@ -47,7 +51,20 @@ async function loadUserData(profileStorage: Storage): Promise<SpotifyUserData> {
     const userDataPath = getUserDataFilePath();
     if (await profileStorage.exists(userDataPath)) {
         const content = await profileStorage.read(userDataPath, "utf8");
-        const json: SpotifyUserDataJSON = JSON.parse(content);
+        const json: SpotifyUserDataJSON = JSON.parse(
+            content,
+            (key: string, value: any) => {
+                if (key === "embedding") {
+                    if (typeof value === "string") {
+                        const normalizedEmbedding: NormalizedEmbedding =
+                            new Float32Array(Buffer.from(value, "base64"));
+                        return normalizedEmbedding;
+                    }
+                    return undefined;
+                }
+                return value;
+            },
+        );
         return {
             lastUpdated: json.lastUpdated,
             tracks: new Map(json.tracks.map((t) => [t.id, t])),
@@ -73,7 +90,18 @@ export async function saveUserData(
         artists: Array.from(userData.artists.values()),
         albums: Array.from(userData.albums.values()),
     };
-    await storage.write(getUserDataFilePath(), JSON.stringify(json, null, 2));
+    const replacer = (key: string, value: any) => {
+        if (key === "embedding") {
+            // base64 encoding
+            const embedding: NormalizedEmbedding = value;
+            return Buffer.from(embedding.buffer).toString("base64");
+        }
+        return value;
+    };
+    await storage.write(
+        getUserDataFilePath(),
+        JSON.stringify(json, replacer, 2),
+    );
 }
 
 export function mergeUserDataKind(
@@ -333,13 +361,13 @@ export async function initializeUserData(
     service: SpotifyService,
 ) {
     const data = await loadUserData(profileStorage);
+    debugSpotify(
+        `Tracks: ${data.tracks.size}, Artists: ${data.artists.size}, Albums: ${data.albums.size}`,
+    );
+
     const result: UserData = {
         data,
     };
-    // print sizes of each map to console
-    console.log(
-        `Tracks: ${data.tracks.size}, Artists: ${data.artists.size}, Albums: ${data.albums.size}`,
-    );
     // Update once a day
     const update = async () => {
         await updateUserData(profileStorage, service, data);

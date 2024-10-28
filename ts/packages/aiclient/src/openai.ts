@@ -799,10 +799,19 @@ export function createEmbeddingModel(
     }
     const model: TextEmbeddingModel = {
         generateEmbedding,
+        get maxBatchSize() {
+            return 2048;
+        },
     };
     return model;
 
-    async function generateEmbedding(input: string): Promise<Result<number[]>> {
+    async function generateEmbedding(input: string): Promise<Result<number[]>>;
+    async function generateEmbedding(
+        input: string[],
+    ): Promise<Result<number[][]>>;
+    async function generateEmbedding(
+        input: string | string[],
+    ): Promise<Result<number[] | number[][]>> {
         const headerResult = await createApiHeaders(settings);
         if (!headerResult.success) {
             return headerResult;
@@ -825,7 +834,11 @@ export function createEmbeddingModel(
 
         const data = result.data as { data: { embedding: number[] }[] };
 
-        return success(data.data[0].embedding);
+        return success(
+            Array.isArray(input)
+                ? data.data.map((d) => d.embedding)
+                : data.data[0].embedding,
+        );
     }
 }
 

@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+import { TextEmbeddingModel } from "aiclient";
 import path from "node:path";
 import {
     ChangeVolumeAction,
@@ -87,6 +88,7 @@ import {
     findTracksWithGenre,
 } from "./search.js";
 import { toTrackObjectFull } from "./spotifyUtils.js";
+import { createEmbeddingModel } from "../../../aiclient/dist/openai.js";
 
 const debugSpotifyError = registerDebug("typeagent:spotify:error");
 
@@ -119,6 +121,7 @@ function getTypeChatLanguageModel() {
 
 export interface IClientContext {
     service: SpotifyService;
+    embeddingModel?: TextEmbeddingModel;
     deviceId?: string | undefined;
     currentTrackList?: ITrackCollection;
     lastTrackStartIndex?: number;
@@ -354,9 +357,11 @@ export async function getClientContext(
         deviceId = activeDevice.id ?? undefined;
     }
 
+    const embeddingModel = createEmbeddingModel();
     return {
         deviceId,
         service,
+        embeddingModel,
         userData: profileStorage
             ? await initializeUserData(profileStorage, service)
             : undefined,

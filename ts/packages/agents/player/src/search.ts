@@ -12,6 +12,7 @@ import {
 import { MusicItemInfo, SpotifyUserData } from "./userData.js";
 import chalk from "chalk";
 import { SpotifyService } from "./service.js";
+import { generateEmbeddings, similarity, SimilarityType } from "typeagent";
 
 const debug = registerDebug("typeagent:spotify:search");
 const debugVerbose = registerDebug("typeagent:verbose:spotify:search");
@@ -462,7 +463,30 @@ export async function findTracksWithGenre(
 ): Promise<SpotifyApi.TrackObjectFull[]> {
     // TODO: cache this.
     const genreSeed = await getGenreSeeds(context.service);
+    if (genreSeed !== undefined && context.embeddingModel !== undefined) {
+        const genreEmbeddings = await generateEmbeddings(
+            context.embeddingModel,
+            [...genreSeed.genres, genre],
+        );
+        const searchEmbedding = genreEmbeddings.pop()!;
+        const similar = genreEmbeddings
+            .map(
+                (embedding, i) =>
+                    [
+                        genreSeed.genres[i],
+                        similarity(
+                            embedding,
+                            searchEmbedding,
+                            SimilarityType.Dot,
+                        ),
+                    ] as const,
+            )
+            .sort((a, b) => b[1] - a[1]);
 
+        for (const item of similar) {
+            console.log(`${item[0]}: ${item[1]}`);
+        }
+    }
     const matchedGenre = genreSeed?.genres.find((g) => g === genre);
 
     const query: SpotifyQuery = matchedGenre

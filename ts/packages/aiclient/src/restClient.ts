@@ -240,7 +240,7 @@ export async function fetchWithRetry(
                 retryCount >= retryMaxAttempts
             ) {
                 return error(
-                    `fetch error\n${result.status}: ${result.statusText}`,
+                    `fetch error (retried: ${retryCount}):\n${result.status}: ${result.statusText}`,
                 );
             }
             await sleep(retryPauseMs);

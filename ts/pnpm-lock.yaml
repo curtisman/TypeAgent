@@ -686,6 +686,9 @@ importers:
       '@typeagent/agent-sdk':
         specifier: workspace:*
         version: link:../../agentSdk
+      aiclient:
+        specifier: workspace:*
+        version: link:../../aiclient
       axios:
         specifier: ^1.7.4
         version: 1.7.7(debug@4.3.4)
@@ -707,6 +710,9 @@ importers:
       open:
         specifier: ^7.0.4
         version: 7.4.2
+      typeagent:
+        specifier: workspace:*
+        version: link:../../typeagent
       typechat:
         specifier: ^0.1.1
         version: 0.1.1(typescript@5.4.3)
