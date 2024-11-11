@@ -100,7 +100,7 @@ async function confirmTranslation(
     requestAction: RequestAction,
     context: ActionContext<CommandHandlerContext>,
 ): Promise<{
-    requestAction: RequestAction | undefined | null;
+    requestAction: RequestAction;
     replacedAction?: Actions;
 }> {
     const actions = requestAction.actions;
@@ -205,32 +205,29 @@ async function matchRequest(
                 context,
             );
 
-            if (requestAction) {
-                if (systemContext.requestIO.isInputEnabled()) {
-                    systemContext.logger?.logEvent("match", {
-                        elapsedMs,
-                        request,
-                        actions: requestAction.actions,
-                        replacedAction,
-                        developerMode: systemContext.developerMode,
-                        translators: useTranslators,
-                        explainerName: systemContext.agentCache.explainerName,
-                        matchWildcard: config.matchWildcard,
-                        allMatches: matches.map((m) => {
-                            const { construction: _, match, ...rest } = m;
-                            return { action: match.actions, ...rest };
-                        }),
-                        history,
-                    });
-                }
-                return {
-                    requestAction,
+            if (systemContext.requestIO.isInputEnabled()) {
+                systemContext.logger?.logEvent("match", {
                     elapsedMs,
-                    fromUser: replacedAction !== undefined,
-                    fromCache: true,
-                };
+                    request,
+                    actions: requestAction.actions,
+                    replacedAction,
+                    developerMode: systemContext.developerMode,
+                    translators: useTranslators,
+                    explainerName: systemContext.agentCache.explainerName,
+                    matchWildcard: config.matchWildcard,
+                    allMatches: matches.map((m) => {
+                        const { construction: _, match, ...rest } = m;
+                        return { action: match.actions, ...rest };
+                    }),
+                    history,
+                });
             }
-            return requestAction;
+            return {
+                requestAction,
+                elapsedMs,
+                fromUser: replacedAction !== undefined,
+                fromCache: true,
+            };
         }
     }
     return undefined;
@@ -519,7 +516,7 @@ export async function translateRequest(
     context: ActionContext<CommandHandlerContext>,
     history?: HistoryContext,
     attachments?: CachedImageWithDetails[],
-): Promise<TranslationResult | undefined | null> {
+): Promise<TranslationResult | undefined> {
     const systemContext = context.sessionContext.agentContext;
     if (!systemContext.session.bot) {
         displayError("No translation found (GPT is off).", context);
@@ -576,27 +573,23 @@ export async function translateRequest(
         context,
     );
 
-    if (requestAction) {
-        if (systemContext.requestIO.isInputEnabled()) {
-            systemContext.logger?.logEvent("translation", {
-                elapsedMs,
-                translatorName,
-                request,
-                actions: requestAction.actions,
-                replacedAction,
-                developerMode: systemContext.developerMode,
-                history,
-            });
-        }
-        return {
-            requestAction,
+    if (systemContext.requestIO.isInputEnabled()) {
+        systemContext.logger?.logEvent("translation", {
             elapsedMs,
-            fromCache: false,
-            fromUser: replacedAction !== undefined,
-        };
+            translatorName,
+            request,
+            actions: requestAction.actions,
+            replacedAction,
+            developerMode: systemContext.developerMode,
+            history,
+        });
     }
-
-    return requestAction;
+    return {
+        requestAction,
+        elapsedMs,
+        fromCache: false,
+        fromUser: replacedAction !== undefined,
+    };
 }
 
 function canExecute(

@@ -169,10 +169,13 @@ function getIdPart(uri: string) {
 }
 
 export async function loadHistoryFile(
-    profileStorage: Storage,
+    profileStorage: Storage | undefined,
     historyPath: string,
     context: IClientContext,
 ) {
+    if (profileStorage === undefined) {
+        throw new Error("Profile storage not available");
+    }
     if (!(await profileStorage.exists(historyPath))) {
         throw new Error(`History file not found: ${historyPath}`);
     }

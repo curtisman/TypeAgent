@@ -106,8 +106,8 @@ export enum AppAgentEvent {
 
 export interface SessionContext<T = unknown> {
     readonly agentContext: T;
-    readonly sessionStorage: Storage | undefined;
-    readonly profileStorage: Storage; // storage that are preserved across sessions
+    readonly sessionStorage?: Storage | undefined;
+    readonly profileStorage?: Storage | undefined; // storage that are preserved across sessions
 
     notify(event: AppAgentEvent, message: string): void;
 
@@ -139,7 +139,7 @@ export interface Storage {
 
 export interface ActionContext<T = void> {
     profiler?: Profiler | undefined;
-    streamingContext: unknown;
+    streamingContext?: unknown;
     readonly actionIO: ActionIO;
     readonly sessionContext: SessionContext<T>;
 }

@@ -36,25 +36,28 @@ async function executeDispatcherAction(
     action: DispatcherActions | ClarifyRequestAction,
     context: ActionContext<CommandHandlerContext>,
 ) {
-    if (action.actionName === "clarifyRequest") {
-        return clarifyRequestAction(action, context);
-    }
+    switch (action.actionName) {
+        case "clarifyAction":
+        case "clarifyParameter":
+            return ClarifyRequestAction(action, context);
 
-    throw new Error(`Unknown dispatcher action: ${action.actionName}`);
+        default:
+            throw new Error(`Unknown dispatcher action: ${action.actionName}`);
+    }
 }
 
-function clarifyRequestAction(
+function ClarifyRequestAction(
     action: ClarifyRequestAction,
     context: ActionContext<CommandHandlerContext>,
 ) {
-    const { request, clarifyingQuestion } = action.parameters;
+    const { request, clarifyingRespondAndQuestion } = action.parameters;
     context.actionIO.appendDisplay({
         type: "text",
         speak: true,
-        content: clarifyingQuestion,
+        content: clarifyingRespondAndQuestion,
     });
 
-    const result = createActionResultNoDisplay(clarifyingQuestion);
+    const result = createActionResultNoDisplay(clarifyingRespondAndQuestion);
     result.additionalInstructions = [
         `Asked the user to clarify the request '${request}'`,
     ];
