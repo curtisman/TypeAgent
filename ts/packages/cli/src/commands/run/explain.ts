@@ -75,6 +75,7 @@ export default class ExplainCommand extends Command {
         const context = await initializeCommandHandlerContext(
             "cli run explain",
             {
+                appAgentProviders: [], // don't need any app agents.
                 schemas,
                 actions: null, // We don't need any actions
                 commands: null,
