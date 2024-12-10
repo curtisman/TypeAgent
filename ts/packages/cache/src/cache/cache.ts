@@ -109,6 +109,20 @@ function checkExplainableValues(
     }
 }
 
+export function getSchemaNameKeys(
+    actions: Actions,
+    schemaInfoProvider?: SchemaInfoProvider,
+) {
+    const schemaNames = actions.translatorNames;
+    return schemaInfoProvider
+        ? schemaNames.map(
+              (name) =>
+                  `${name}${schemaInfoProvider.getActionSchemaFileHash(name)}`,
+          )
+        : schemaNames;
+    schemaInfoProvider;
+}
+
 export class AgentCache {
     private _constructionStore: ConstructionStoreImpl;
     private queue: QueueObject<{
@@ -152,7 +166,7 @@ export class AgentCache {
 
     private getExplainerForActions(actions: Actions) {
         return this.getExplainerForTranslator(
-            actions.action?.translatorName,
+            actions.translatorNames,
             this.model,
         );
     }
@@ -220,8 +234,12 @@ export class AgentCache {
                 if (construction === undefined) {
                     message = `Explainer '${this.explainerName}' doesn't support constructions.`;
                 } else {
+                    const schemaNameKeys = getSchemaNameKeys(
+                        actions,
+                        this.schemaInfoProvider,
+                    );
                     const result = await store.addConstruction(
-                        actions.translatorNames,
+                        schemaNameKeys,
                         construction,
                     );
                     if (result.added) {

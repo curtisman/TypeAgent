@@ -196,7 +196,7 @@ async function matchRequest(
         const matches = constructionStore.match(request, {
             wildcard: config.cache.matchWildcard,
             rejectReferences: config.explainer.filter.reference.list,
-            useTranslators,
+            schemaNameKeys: useTranslators,
             history,
         });
 

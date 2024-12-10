@@ -27,15 +27,15 @@ import {
 const debugConst = registerDebug("typeagent:const");
 const debugConstMatchStat = registerDebug("typeagent:const:match:stat");
 // Namespace policies
-function getConstructionNamespace(translatorNames: string[]) {
+function getConstructionNamespace(schemaNames: string[]) {
     // Constructions namespaces are just the set to translator names so that we can
     // filter easily when translator is disabled or not.
 
     // Flatten to a string using | as the separator to use as key in mapped look up.
-    return translatorNames.join("|");
+    return schemaNames.join("|");
 }
 
-function getTranslatorNamesFromConstructionNamespace(
+function getSchemaNameKeysFromConstructionNamespace(
     constructionNamespace: string,
 ) {
     // Convert the namespace into an array of translator names for filtering.
@@ -75,7 +75,8 @@ type Constructions = {
 };
 
 export type MatchOptions = {
-    useTranslators?: string[] | undefined;
+    // A list of schema name keys (<schemaName>,<hash>) to filter.  If undefined, all constructions are used.
+    schemaNameKeys?: string[] | undefined;
     wildcard?: boolean; // default is true
     rejectReferences?: boolean; // default is true
     conflicts?: boolean; // default is false
@@ -150,7 +151,7 @@ export class ConstructionCache {
     }
 
     public addConstruction(
-        translatorNames: string[],
+        schemaNameKeys: string[],
         construction: Construction,
         mergeMatchSets: boolean,
         cacheConflicts?: boolean,
@@ -166,7 +167,7 @@ export class ConstructionCache {
                 : p,
         );
 
-        const namespace = getConstructionNamespace(translatorNames);
+        const namespace = getConstructionNamespace(schemaNameKeys);
         const constructionNamespace =
             this.ensureConstructionNamespace(namespace);
         this.mergeTransformNamespaces(
@@ -244,7 +245,7 @@ export class ConstructionCache {
     }
 
     public match(request: string, options?: MatchOptions): MatchResult[] {
-        const useTranslators = options?.useTranslators;
+        const schemaNameKeys = options?.schemaNameKeys;
         const config = {
             enableWildcard: options?.wildcard ?? true, // default to true.
             rejectReferences: options?.rejectReferences ?? true, // default to true.
@@ -256,16 +257,16 @@ export class ConstructionCache {
         // If the useTranslators is undefined use all the translators
         // otherwise filter the translators based on the useTranslators
         const matches: MatchResult[] = [];
-        const filter = useTranslators ? new Set(useTranslators) : undefined;
+        const filter = schemaNameKeys ? new Set(schemaNameKeys) : undefined;
         for (const [
             name,
             constructionNamespace,
         ] of this.constructionNamespaces.entries()) {
-            const translatorNames =
-                getTranslatorNamesFromConstructionNamespace(name);
+            const schemaNameKeys =
+                getSchemaNameKeysFromConstructionNamespace(name);
             if (
-                translatorNames.some(
-                    (translatorName) => filter?.has(translatorName) === false,
+                schemaNameKeys.some(
+                    (schemaNameKey) => filter?.has(schemaNameKey) === false,
                 )
             ) {
                 continue;
