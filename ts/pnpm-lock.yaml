@@ -1089,6 +1089,55 @@ importers:
         specifier: ^5.4.2
         version: 5.4.3
 
+  packages/agents/turtle:
+    dependencies:
+      agent-dispatcher:
+        specifier: workspace:*
+        version: link:../../dispatcher
+      chalk:
+        specifier: ^5.3.0
+        version: 5.3.0
+      debug:
+        specifier: ^4.3.4
+        version: 4.3.4(supports-color@8.1.1)
+    devDependencies:
+      '@types/debug':
+        specifier: ^4.1.10
+        version: 4.1.10
+      '@types/jest':
+        specifier: ^29.5.7
+        version: 29.5.7
+      '@types/node':
+        specifier: ^18.18.7
+        version: 18.18.7
+      copy-webpack-plugin:
+        specifier: ^12.0.1
+        version: 12.0.2(webpack@5.94.0)
+      jest:
+        specifier: ^29.7.0
+        version: 29.7.0(@types/node@18.18.7)(ts-node@10.9.1(@types/node@18.18.7)(typescript@5.4.3))
+      prettier:
+        specifier: ^3.2.5
+        version: 3.2.5
+      rimraf:
+        specifier: ^5.0.5
+        version: 5.0.5
+      ts-loader:
+        specifier: ^9.5.1
+        version: 9.5.1(typescript@5.4.3)(webpack@5.94.0)
+      typescript:
+        specifier: ^5.4.2
+        version: 5.4.3
+      webpack:
+        specifier: ^5.94.0
+        version: 5.94.0(webpack-cli@5.1.4)
+      webpack-cli:
+        specifier: ^5.1.4
+        version: 5.1.4(webpack-dev-server@5.0.4)(webpack@5.94.0)
+      webpack-dev-server:
+        specifier: ^5.0.4
+        version: 5.0.4(debug@4.3.4)(webpack-cli@5.1.4)(webpack@5.94.0)
+
   packages/aiclient:
     dependencies:
       '@azure/identity':
