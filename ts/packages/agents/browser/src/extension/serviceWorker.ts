@@ -1528,3 +1528,80 @@ chrome.contextMenus?.onClicked.addListener(
         }
     },
 );
+
+const agents = new Set<string>();
+chrome.runtime.onConnect.addListener(async (port) => {
+    if (!webSocket || webSocket.readyState !== WebSocket.OPEN) {
+        port.disconnect();
+        return;
+    }
+
+    const initP = new Promise((resolve, reject) => {
+        const handler = (message: any) => {
+            if (message.name !== port.name || message.manifest === undefined) {
+                resolve(false);
+                return;
+            }
+            // TODO: validate the manifest
+            if (agents.has(port.name)) {
+                port.disconnect();
+                return;
+            }
+
+            agents.add(port.name);
+            port.onDisconnect.addListener(() => {
+                agents.delete(port.name);
+                webSocket.send(
+                    JSON.stringify({
+                        target: "dispatcher",
+                        source: "webAgent",
+                        messageType: "remove",
+                        message,
+                    }),
+                );
+            });
+            webSocket.send(
+                JSON.stringify({
+                    target: "dispatcher",
+                    source: "webAgent",
+                    messageType: "add",
+                    message,
+                }),
+            );
+            port.onMessage.removeListener(handler);
+            resolve(true);
+        };
+        port.onMessage.addListener(handler);
+    });
+
+    if (!(await initP)) {
+        port.disconnect();
+        return;
+    }
+
+    // Proxy the messages between the websocket and the content script
+    port.onMessage.addListener((message) => {
+        webSocket.send(
+            JSON.stringify({
+                target: "dispatcher",
+                source: "webAgent",
+                messageType: "message",
+                message: {
+                    name: port.name,
+                    message,
+                },
+            }),
+        );
+    });
+    webSocket.addEventListener("message", (data: any) => {
+        if (
+            data.target === "webAgent" &&
+            data.source === "dispatcher" &&
+            data.messageType === "message"
+        ) {
+            if (data.message.name === port.name) {
+                port.postMessage(data.message.message);
+            }
+        }
+    });
+});

@@ -423,10 +423,16 @@ importers:
 
   packages/agentSdk:
     dependencies:
+      debug:
+        specifier: ^4.3.4
+        version: 4.3.4(supports-color@8.1.1)
       type-fest:
         specifier: ^4.26.1
         version: 4.26.1
     devDependencies:
+      '@types/debug':
+        specifier: ^4.1.10
+        version: 4.1.10
       '@types/jest':
         specifier: ^29.5.7
         version: 29.5.7

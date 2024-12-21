@@ -9,6 +9,11 @@ import {
 } from "../action.js";
 import { Entity } from "../memory.js";
 
+export interface JSONAction {
+    fullActionName: string;
+    parameters?: Record<string, unknown> | undefined;
+}
+
 export function createActionResultNoDisplay(
     literalText: string,
 ): ActionResultSuccessNoDisplay {

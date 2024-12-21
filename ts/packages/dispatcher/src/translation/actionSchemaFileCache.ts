@@ -107,6 +107,10 @@ export class ActionSchemaFileCache {
         return parsed;
     }
 
+    public unloadActionSchemaFile(schemaName: string) {
+        this.actionSchemaFiles.delete(schemaName);
+    }
+
     private addToCache(key: string, actionSchemaFile: ActionSchemaFileJSON) {
         if (this.cacheFilePath === undefined) {
             return;

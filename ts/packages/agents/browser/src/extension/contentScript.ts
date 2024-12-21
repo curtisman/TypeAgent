@@ -5,6 +5,11 @@ import { Readability, isProbablyReaderable } from "@mozilla/readability";
 import { HTMLReducer } from "./htmlReducer";
 import { convert } from "html-to-text";
 import DOMPurify from "dompurify";
+import { AppAgent, AppAgentManifest } from "@typeagent/agent-sdk";
+import {
+    createAgentRpcServer,
+    createGenericChannelProvider,
+} from "@typeagent/agent-sdk/helpers/rpc/server";
 
 function isVisible(element: HTMLElement) {
     var html = document.documentElement;
@@ -702,3 +707,31 @@ window.addEventListener(
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("Content Script initialized");
 });
+
+declare global {
+    function registerTypeAgent(
+        name: string,
+        manifest: AppAgentManifest,
+        agent: AppAgent,
+    ): void;
+}
+
+global.registerTypeAgent = (
+    name: string,
+    manifest: AppAgentManifest,
+    agent: AppAgent,
+): void => {
+    const port = chrome.runtime?.connect({ name });
+
+    port.postMessage({
+        name,
+        manifest,
+    });
+    const provider = createGenericChannelProvider((message: any) =>
+        port.postMessage(message),
+    );
+
+    port.onMessage.addListener((message) => provider.message(message));
+    port.onDisconnect.addListener(() => provider.disconnect());
+    createAgentRpcServer(name, agent, provider);
+};
