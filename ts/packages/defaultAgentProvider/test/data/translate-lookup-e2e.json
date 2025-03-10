@@ -1,0 +1,5 @@
+[
+    {"request": "play this week's top 10 songs on the billboard chart", "action": "dispatcher.clarify.lookupInternetInformation"},
+    {"request": "play song from the artist that we talked about when we were discussing flower", "action": "dispatcher.clarify.lookupConversation"},
+    {"request": "play the song we talked about yesterday by Bach", "action": "dispatcher.clarify.lookupConversation"}
+]

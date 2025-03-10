@@ -33,7 +33,6 @@ export type DateTimeRange = {
 export type LookupTerms = {
     // action verb terms to look for
     verbs?: string[];
-    // All the terms and filters to lookup for.
     // Terms are one of the following:
     // Entity Terms:
     // - the name of an entity or thing such as "Bach", "Great Gatsby", "frog" or "piano"
@@ -42,7 +41,7 @@ export type LookupTerms = {
     // - facets: specific, inherent, defining, or non-immediate facet of an entity such as "blue", "old", "famous", "sister", "aunt_of", "weight: 4 kg"
     // Action Terms:
     // - subject, object and indirectObject associated with the verb
-    // verbs are not duplicated
+    // verbs are not duplicated.
     terms: string[];
     // Use only if request explicitly asks for time range
     timeRange?: DateTimeRange | undefined; // in this time range
