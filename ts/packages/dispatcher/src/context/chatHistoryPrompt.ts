@@ -92,7 +92,9 @@ export function createTypeAgentRequestPrompt(
         prompts.push(
             "Resolve all explicit and pronouns in the current user request with the recent entities in the chat history. Determine the entities implicitly referred in the current user request based on the chat history.",
             "MUST not use the entity's name as parameter values. Use entities' id as parameter values when referring to entities",
-            "If there are multiple possible resolution, choose the most likely resolution based on conversation context, bias toward the newest. Avoid clarifying unless absolutely necessary. Infer the user's intent based on conversation context.",
+            "If there are multiple possible resolution, choose the most likely resolution based on conversation context, bias toward the newest.",
+            "If information is missing, use actions to load the information into context.",
+            "Avoid clarifying with unless absolutely necessary. Infer the user's intent based on conversation context.",
         );
     }
     prompts.push(

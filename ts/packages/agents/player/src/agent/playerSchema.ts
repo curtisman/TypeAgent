@@ -18,7 +18,7 @@ export type PlayerAction =
     | SelectDeviceAction
     | SetVolumeAction
     | ChangeVolumeAction
-    | SearchTracksAction
+    //   | SearchTracksAction
     | ListPlaylistsAction
     | GetPlaylistAction
     | GetAlbumAction
@@ -140,18 +140,6 @@ export interface ChangeVolumeAction {
     parameters: {
         // volume change percentage
         volumeChangePercentage: number;
-    };
-}
-
-// this action is only used when the user asks for a search as in 'search', 'find', 'look for'
-// query is a Spotify search expression such as 'Rock Lobster' or 'te kanawa queen of night'
-// set the current track list to the result of the search
-export interface SearchTracksAction {
-    actionName: "searchTracks";
-    parameters: {
-        // the part of the request specifying the the search keywords
-        // examples: song name, album name, artist name
-        query: string;
     };
 }
 

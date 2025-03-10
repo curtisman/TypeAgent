@@ -17,7 +17,10 @@ import {
 import { CommandHandlerContext } from "../commandHandlerContext.js";
 import { createActionResultNoDisplay } from "@typeagent/agent-sdk/helpers/action";
 import { DispatcherActions } from "./schema/dispatcherActionSchema.js";
-import { ClarifyRequestAction } from "./schema/clarifyActionSchema.js";
+import {
+    ClarifyActions,
+    ClarifyRequestAction,
+} from "./schema/clarifyActionSchema.js";
 
 const dispatcherHandlers: CommandHandlerTable = {
     description: "Type Agent Dispatcher Commands",
@@ -29,13 +32,13 @@ const dispatcherHandlers: CommandHandlerTable = {
 };
 
 async function executeDispatcherAction(
-    action: TypeAgentAction<DispatcherActions | ClarifyRequestAction>,
+    action: TypeAgentAction<DispatcherActions | ClarifyActions>,
     context: ActionContext<CommandHandlerContext>,
 ) {
     if (
         action.actionName === "clarifyMultiplePossibleActionName" ||
         action.actionName === "clarifyMissingParameter" ||
-        action.actionName === "clarifyUnresolvedReference"
+        action.actionName === "clarifyUnresolvedPronounReference"
     ) {
         return clarifyRequestAction(action, context);
     }
@@ -77,7 +80,7 @@ export const dispatcherManifest: AppAgentManifest = {
                 description: "Action that helps you clarify your request.",
                 schemaFile:
                     "./src/context/dispatcher/schema/clarifyActionSchema.ts",
-                schemaType: "ClarifyRequestAction",
+                schemaType: "ClarifyActions",
                 injected: true,
                 cached: false,
             },

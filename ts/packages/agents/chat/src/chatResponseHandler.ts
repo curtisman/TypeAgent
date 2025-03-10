@@ -2,13 +2,11 @@
 // Licensed under the MIT License.
 
 import fs from "node:fs";
-import { getImageElement, getMimeType } from "common-utils";
 import { StopWatch } from "telemetry";
 import {
     ChatResponseAction,
     Entity,
     GenerateResponseAction,
-    LookupAndGenerateResponseAction,
 } from "./chatResponseActionSchema.js";
 import {
     ChunkChatResponse,
@@ -29,14 +27,9 @@ import {
 } from "@typeagent/agent-sdk";
 import {
     createActionResult,
-    createActionResultFromHtmlDisplay,
     createActionResultNoDisplay,
 } from "@typeagent/agent-sdk/helpers/action";
 import { fileURLToPath } from "node:url";
-import {
-    conversation,
-    conversation as Conversation,
-} from "knowledge-processor";
 
 export function instantiate(): AppAgent {
     return {
@@ -64,7 +57,7 @@ export async function executeChatResponseAction(
     }
     return handleChatResponse(chatAction, context);
 }
-
+/*
 async function rehydrateImages(context: ActionContext, files: string[]) {
     let html = "<div>";
 
@@ -91,7 +84,7 @@ async function rehydrateImages(context: ActionContext, files: string[]) {
 
     return html;
 }
-
+*/
 async function handleChatResponse(
     chatAction: ChatResponseAction,
     context: ActionContext,
@@ -148,6 +141,7 @@ async function handleChatResponse(
                 return result;
             }
         }
+        /*
         case "lookupAndGenerateResponse": {
             const lookupAction = chatAction as LookupAndGenerateResponseAction;
             if (
@@ -236,10 +230,11 @@ async function handleChatResponse(
                 );
             }
         }
+            */
     }
     return createActionResult("No information found");
 }
-
+/*
 function matchedEntities(response: conversation.SearchResponse): Entity[] {
     const entities = response.getEntities();
     return entities.length > 0
@@ -253,7 +248,7 @@ function compositeEntityToEntity(entity: conversation.CompositeEntity): Entity {
         type: [...entity.type, conversation.KnownEntityTypes.Memorized],
     };
 }
-
+*/
 export function logEntities(label: string, entities?: Entity[]): void {
     if (entities && entities.length > 0) {
         console.log(label);

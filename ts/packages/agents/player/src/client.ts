@@ -14,7 +14,7 @@ import {
     PlayGenreAction,
     PlayRandomAction,
     PlayTrackAction,
-    SearchTracksAction,
+    //SearchTracksAction,
     SelectDeviceAction,
     SetVolumeAction,
     ShuffleAction,
@@ -886,6 +886,7 @@ export async function handleCall(
             }
             return createErrorActionResult("No active device found");
         }
+        /*
         case "searchTracks": {
             const searchTracksAction = action as SearchTracksAction;
             const queryString = searchTracksAction.parameters.query;
@@ -897,6 +898,7 @@ export async function handleCall(
             }
             return createNotFoundActionResult("tracks", queryString);
         }
+            */
         case "listPlaylists": {
             const playlists = await getPlaylists(clientContext.service);
             if (playlists) {
