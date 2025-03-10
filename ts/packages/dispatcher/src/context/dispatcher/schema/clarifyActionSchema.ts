@@ -48,8 +48,9 @@ export type LookupTerms = {
     timeRange?: DateTimeRange | undefined; // in this time range
 };
 
-// If the request references past conversation, always use this action to look the information.
-// Private information from past conversations including personal facts like birthdays, private events, plans, projects in progress, attachments, files, file names, and other items from discussions with team members or the assistant, use the conversation lookup filters
+// For request that references information from past conversations and discussions, use this action to look up the information.
+// E.g. song we discussed last week, the list we create when talking about flowers.
+// Additional private information can be found from past conversations include personal facts like birthdays, private events, plans, projects in progress, attachments, files, file names, and other items from discussions with team members or the assistant, use the conversation lookup filters
 export interface LookupConversationAction {
     actionName: "lookupConversation";
     parameters: {

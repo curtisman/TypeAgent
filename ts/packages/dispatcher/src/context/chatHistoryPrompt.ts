@@ -80,7 +80,7 @@ export function createTypeAgentRequestPrompt(
 
         prompts.push("###");
         prompts.push(
-            `Current Date is ${new Date().toLocaleDateString("en-US")}. The time is ${new Date().toLocaleTimeString()}.`,
+            `Current Date in MM/DD/YYYY format is ${new Date().toLocaleDateString("en-US")}. The time is ${new Date().toLocaleTimeString()}.`,
         );
     }
     prompts.push("###");
