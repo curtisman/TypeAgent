@@ -186,8 +186,8 @@ export async function createAgentRpcClient(
             contextId: number;
             session: boolean;
             storagePath: string;
-            options?: StorageEncoding | undefined;
-        }) => {
+            options: StorageEncoding;
+        }): Promise<string> => {
             const context = contextMap.get(param.contextId);
             const options = param.options;
             const storage = getStorage(param, context);
