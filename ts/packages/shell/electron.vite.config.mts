@@ -1,18 +1,21 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { defineConfig } from "electron-vite";
 import { resolve } from "path";
 
 export default defineConfig({
     main: {
-        plugins: [externalizeDepsPlugin()],
+        //plugins: [externalizeDepsPlugin()],
         build: {
             sourcemap: true,
+            rollupOptions: {
+                external: ["typescript", "sharp"],
+            },
         },
     },
     preload: {
-        plugins: [externalizeDepsPlugin()],
+        //plugins: [externalizeDepsPlugin()],
         build: {
             sourcemap: true,
             rollupOptions: {
