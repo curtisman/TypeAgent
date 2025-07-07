@@ -8,6 +8,7 @@ import { ChatModel } from "aiclient";
 import { createKnowledgeModel } from "./conversationIndex.js";
 import {
     concreteToMergedEntities,
+    EntityMergeOptions,
     mergedToConcreteEntity,
 } from "./knowledgeMerge.js";
 import { BatchTask, runInBatches } from "./taskQueue.js";
@@ -64,8 +65,9 @@ export function extractKnowledgeFromTextBatch(
 
 export function mergeConcreteEntities(
     entities: kpLib.ConcreteEntity[],
+    options?: EntityMergeOptions,
 ): kpLib.ConcreteEntity[] {
-    let mergedEntities = concreteToMergedEntities(entities);
+    let mergedEntities = concreteToMergedEntities(entities, options);
 
     const mergedConcreteEntities: kpLib.ConcreteEntity[] = [];
     for (const mergedEntity of mergedEntities.values()) {

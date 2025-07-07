@@ -155,10 +155,10 @@ export class Message<TMeta extends MessageMetadata = MessageMetadata>
         newKnowledge: kpLib.KnowledgeResponse,
     ): kpLib.KnowledgeResponse {
         if (this.knowledge !== undefined) {
-            this.knowledge.entities = kp.mergeConcreteEntities([
-                ...this.knowledge.entities,
-                ...newKnowledge.entities,
-            ]);
+            this.knowledge.entities = kp.mergeConcreteEntities(
+                [...this.knowledge.entities, ...newKnowledge.entities],
+                { lowerCase: false },
+            );
             this.knowledge.topics = kp.mergeTopics([
                 ...this.knowledge.topics,
                 ...newKnowledge.topics,
@@ -185,6 +185,7 @@ export class Message<TMeta extends MessageMetadata = MessageMetadata>
         combinedKnowledge.entities.push(...metaKnowledge.entities);
         combinedKnowledge.entities = kp.mergeConcreteEntities(
             combinedKnowledge.entities,
+            { lowerCase: false },
         );
         combinedKnowledge.topics.push(...metaKnowledge.topics);
         combinedKnowledge.topics = kp.mergeTopics(combinedKnowledge.topics);

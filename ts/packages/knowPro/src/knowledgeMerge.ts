@@ -148,10 +148,11 @@ function mergeMessageOrdinals(mergedEntity: MergedKnowledge, sr: SemanticRef) {
 
 export function concreteToMergedEntities(
     entities: kpLib.ConcreteEntity[],
+    options?: EntityMergeOptions,
 ): Map<string, MergedEntity> {
     let mergedEntities = new Map<string, MergedEntity>();
     for (let entity of entities) {
-        const mergedEntity = concreteToMergedEntity(entity);
+        const mergedEntity = concreteToMergedEntity(entity, options);
         const existing = mergedEntities.get(mergedEntity.name);
         if (existing) {
             unionEntities(existing, mergedEntity);
@@ -162,13 +163,29 @@ export function concreteToMergedEntities(
     return mergedEntities;
 }
 
-function concreteToMergedEntity(entity: kpLib.ConcreteEntity): MergedEntity {
+export type EntityMergeOptions = {
+    /* Convert the entity to lower case when merging */
+    lowerCase?: boolean; // default to true
+};
+
+function concreteToMergedEntity(
+    entity: kpLib.ConcreteEntity,
+    options?: EntityMergeOptions,
+): MergedEntity {
+    let name = entity.name;
     let type = [...entity.type];
-    collections.lowerAndSort(type);
+    if (options?.lowerCase !== false) {
+        // Convert to lower case for case-insensitive merging
+        name = name.toLowerCase();
+        type = type.map((t) => t.toLowerCase());
+    }
+    type.sort();
     return {
-        name: entity.name.toLowerCase(),
-        type: type,
-        facets: entity.facets ? facetsToMergedFacets(entity.facets) : undefined,
+        name,
+        type,
+        facets: entity.facets
+            ? facetsToMergedFacets(entity.facets, options)
+            : undefined,
     };
 }
 
@@ -185,14 +202,22 @@ export function mergedToConcreteEntity(
     return entity;
 }
 
-function facetsToMergedFacets(facets: kpLib.Facet[]): MergedFacets {
+function facetsToMergedFacets(
+    facets: kpLib.Facet[],
+    options?: EntityMergeOptions,
+): MergedFacets {
     const mergedFacets: MergedFacets = new collections.MultiMap<
         string,
         string
     >();
     for (const facet of facets) {
-        const name = facet.name.toLowerCase();
-        const value = facetValueToString(facet).toLowerCase();
+        let name = facet.name;
+        let value = facetValueToString(facet);
+        if (options?.lowerCase !== false) {
+            // Convert to lower case for case-insensitive merging
+            name = name.toLowerCase();
+            value = value.toLowerCase();
+        }
         mergedFacets.addUnique(name, value);
     }
     return mergedFacets;
