@@ -72,7 +72,10 @@ import {
 
 import registerDebug from "debug";
 import path from "node:path";
-import { createSchemaInfoProvider } from "../translation/actionSchemaFileCache.js";
+import {
+    ActionSchemaFileCache,
+    createSchemaInfoProvider,
+} from "../translation/actionSchemaFileCache.js";
 import { createBuiltinAppAgentProvider } from "./inlineAgentProvider.js";
 import { CommandResult } from "@typeagent/dispatcher-types";
 import { DispatcherName } from "./dispatcher/dispatcherUtils.js";
@@ -448,6 +451,11 @@ export async function initializeCommandHandlerContext(
             activationId: randomUUID(),
         });
 
+        const cacheStorage = persistDir
+            ? storageProvider?.getStorage("cache", persistDir)
+            : undefined;
+        const actionSchemaFileCache =
+            await ActionSchemaFileCache.create(cacheStorage);
         const cacheDir = persistDir ? ensureCacheDir(persistDir) : undefined;
         const embeddingCacheDir = options?.embeddingCacheDir;
         if (embeddingCacheDir) {
@@ -455,7 +463,7 @@ export async function initializeCommandHandlerContext(
         }
         const portBase = options?.portBase ?? 9001;
         const agents = new AppAgentManager(
-            cacheDir,
+            actionSchemaFileCache,
             portBase,
             options?.allowSharedLocalView,
             options?.agentInitOptions,

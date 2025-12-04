@@ -43,7 +43,7 @@ export async function createActionConfigProvider(
     };
 
     const actionConfigs = getActionConfigs(appAgentManifests);
-    const actionSchemaFileCache = new ActionSchemaFileCache();
+    const actionSchemaFileCache = await ActionSchemaFileCache.create();
     const actionConfigProvider: ActionConfigProvider = {
         tryGetActionConfig(schemaName: string) {
             return actionConfigs[schemaName];

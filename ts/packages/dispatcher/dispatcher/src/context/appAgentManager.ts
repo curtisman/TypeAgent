@@ -27,7 +27,6 @@ import {
     EmbeddingCache,
 } from "../translation/actionSchemaSemanticMap.js";
 import { ActionSchemaFileCache } from "../translation/actionSchemaFileCache.js";
-import path from "node:path";
 import { callEnsureError } from "../utils/exceptions.js";
 import {
     AppAgentStateConfig,
@@ -113,20 +112,13 @@ export class AppAgentManager implements ActionConfigProvider {
     private readonly actionConfigs = new Map<string, ActionConfig>();
     private readonly transientAgents: Record<string, boolean | undefined> = {};
     private readonly actionSemanticMap?: ActionSchemaSemanticMap;
-    private readonly actionSchemaFileCache: ActionSchemaFileCache;
     private nextPortIndex = 0;
     public constructor(
-        cacheDir: string | undefined,
+        private readonly actionSchemaFileCache: ActionSchemaFileCache,
         private readonly portBase: number,
         private readonly allowSharedLocalView?: string[],
         private readonly agentInitOptions?: Record<string, unknown>,
     ) {
-        this.actionSchemaFileCache = new ActionSchemaFileCache(
-            cacheDir
-                ? path.join(cacheDir, "actionSchemaFileCache.json")
-                : undefined,
-        );
-
         try {
             this.actionSemanticMap = new ActionSchemaSemanticMap();
         } catch (e) {

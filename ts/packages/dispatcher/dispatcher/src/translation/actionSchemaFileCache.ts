@@ -14,9 +14,13 @@ import {
     ActionConfigProvider,
     ActionSchemaFile,
 } from "./actionConfigProvider.js";
-import { AppAction, SchemaFormat, SchemaTypeNames } from "@typeagent/agent-sdk";
+import {
+    AppAction,
+    SchemaFormat,
+    SchemaTypeNames,
+    Storage,
+} from "@typeagent/agent-sdk";
 import { DeepPartialUndefined, simpleStarRegex } from "@typeagent/common-utils";
-import fs from "node:fs";
 import crypto from "node:crypto";
 import registerDebug from "debug";
 import { SchemaInfoProvider } from "agent-cache";
@@ -123,23 +127,84 @@ function saveActionSchemaFile(
     };
 }
 
+async function loadExistingCache(cacheStorage: Storage, cacheFilePath: string) {
+    try {
+        const data = await cacheStorage.read(cacheFilePath, "utf8");
+        const content = JSON.parse(data) as any;
+        if (content.version !== ActionSchemaFileCacheVersion) {
+            debugError(
+                `Invalid cache version: ${cacheFilePath}: ${content.version}`,
+            );
+            return undefined;
+        }
+        return content as ActionSchemaFileCacheJSON;
+    } catch {}
+    return undefined;
+}
+
 export class ActionSchemaFileCache {
     private readonly actionSchemaFiles = new Map<string, ActionSchemaFile>();
     private readonly prevSaved = new Map<string, ActionSchemaFileJSON>();
-    public constructor(private readonly cacheFilePath?: string) {
-        if (cacheFilePath !== undefined) {
+    public static async create(
+        cacheStorage?: Storage | undefined,
+        cacheFilePath: string = "actionSchemaFileCache.json",
+    ): Promise<ActionSchemaFileCache> {
+        if (cacheStorage !== undefined) {
             try {
-                const cache = this.loadExistingCache();
+                const cache = await loadExistingCache(
+                    cacheStorage,
+                    cacheFilePath,
+                );
                 if (cache) {
-                    for (const [key, entry] of cache.entries) {
-                        this.prevSaved.set(key, entry);
-                    }
                     // We will rewrite it.
-                    fs.unlinkSync(cacheFilePath);
+                    cacheStorage.delete(cacheFilePath);
                 }
+
                 debug(`Loaded parsed schema cache: ${cacheFilePath}`);
+
+                const updateCache = async (
+                    key: string,
+                    actionSchemaFile: ActionSchemaFileJSON,
+                ) => {
+                    try {
+                        const cache = (await loadExistingCache(
+                            cacheStorage,
+                            cacheFilePath,
+                        )) ?? {
+                            version: ActionSchemaFileCacheVersion,
+                            entries: [],
+                        };
+                        cache.entries.push([key, actionSchemaFile]);
+                        await cacheStorage.write(
+                            cacheFilePath,
+                            JSON.stringify(cache),
+                            "utf8",
+                        );
+                    } catch (e: any) {
+                        // ignore error
+                        debugError(
+                            `Failed to write parsed schema cache: ${cacheFilePath}: ${e.message}`,
+                        );
+                    }
+                };
+                return new ActionSchemaFileCache(cache, updateCache);
             } catch (e) {
                 debugError(`Failed to load parsed schema cache: ${e}`);
+            }
+        }
+        return new ActionSchemaFileCache();
+    }
+
+    private constructor(
+        cache?: ActionSchemaFileCacheJSON,
+        private readonly updateCache?: (
+            key: string,
+            actionSchameFile: ActionSchemaFileJSON,
+        ) => Promise<void>,
+    ) {
+        if (cache !== undefined) {
+            for (const [key, entry] of cache.entries) {
+                this.prevSaved.set(key, entry);
             }
         }
     }
@@ -220,7 +285,7 @@ export class ActionSchemaFileCache {
                   };
         this.actionSchemaFiles.set(actionConfig.schemaName, parsed);
 
-        if (this.cacheFilePath !== undefined) {
+        if (this.updateCache !== undefined) {
             this.addToCache(cacheKey, saveActionSchemaFile(parsed));
         }
         return parsed;
@@ -230,45 +295,15 @@ export class ActionSchemaFileCache {
         this.actionSchemaFiles.delete(schemaName);
     }
 
-    private addToCache(key: string, actionSchemaFile: ActionSchemaFileJSON) {
-        if (this.cacheFilePath === undefined) {
+    private async addToCache(
+        key: string,
+        actionSchemaFile: ActionSchemaFileJSON,
+    ) {
+        if (this.updateCache === undefined) {
             return;
         }
 
-        try {
-            const cache = this.loadExistingCache() ?? {
-                version: ActionSchemaFileCacheVersion,
-                entries: [],
-            };
-            cache.entries.push([key, actionSchemaFile]);
-            fs.writeFileSync(
-                this.cacheFilePath,
-                JSON.stringify(cache),
-                "utf-8",
-            );
-        } catch (e: any) {
-            // ignore error
-            debugError(
-                `Failed to write parsed schema cache: ${this.cacheFilePath}: ${e.message}`,
-            );
-        }
-    }
-
-    private loadExistingCache() {
-        try {
-            if (this.cacheFilePath) {
-                const data = fs.readFileSync(this.cacheFilePath, "utf-8");
-                const content = JSON.parse(data) as any;
-                if (content.version !== ActionSchemaFileCacheVersion) {
-                    debugError(
-                        `Invalid cache version: ${this.cacheFilePath}: ${content.version}`,
-                    );
-                    return undefined;
-                }
-                return content as ActionSchemaFileCacheJSON;
-            }
-        } catch {}
-        return undefined;
+        this.updateCache(key, actionSchemaFile);
     }
 }
 
