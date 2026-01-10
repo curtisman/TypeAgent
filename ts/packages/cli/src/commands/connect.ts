@@ -18,6 +18,9 @@ export default class Connect extends Command {
             description:
                 "Initial request to send to the type agent upon connection",
         }),
+        uri: Flags.string({
+            description: "URI containing the request to send to the type agent upon connection",
+        }),
         exit: Flags.boolean({
             description:
                 "Exit after processing --request or input file.  No effect if request or file is not provided.",
@@ -49,6 +52,21 @@ export default class Connect extends Command {
                 if (flags.request) {
                     await dispatcher.processCommand(flags.request);
                     processed = true;
+                }
+                if (flags.uri) {
+                    // uri must be type-agent://?request=<request>
+                    const url = new URL(flags.uri);
+                    if (url.protocol !== "type-agent:") {
+                        this.error("Invalid URI protocol, must be type-agent://");
+                    }
+                    const request = url.searchParams.get("request");
+                    if (request) {
+                        await dispatcher.processCommand(request);
+                        processed = true;
+                    }
+                    else {
+                        this.error("No request found in URI");
+                    }
                 }
                 if (args.input) {
                     await dispatcher.processCommand(`@run ${args.input}`);
