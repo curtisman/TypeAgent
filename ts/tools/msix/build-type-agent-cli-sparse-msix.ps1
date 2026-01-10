@@ -67,9 +67,6 @@ param(
     [string] $ProtocolName = "type-agent",
 
     [Parameter(Mandatory = $false)]
-    [string] $ActionProtocolName = "typeagent-action",
-
-    [Parameter(Mandatory = $false)]
     [string] $ExeName = "type-agent-cli.exe",
 
     [Parameter(Mandatory = $false)]
@@ -132,6 +129,23 @@ function Find-WindowsSdkTool([string] $toolName) {
 function Write-FileUtf8NoBom([string] $path, [string] $content) {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($path, $content, $utf8NoBom)
+}
+
+function Get-UnsignedPublisher([string] $publisher) {
+    # Unsigned MSIX packages require an "Unsigned marker" OID field in the Publisher identity.
+    # It must be the last field.
+    $marker = "OID.2.25.311729368913984317654407730594956997722=1"
+    if (-not $publisher) {
+        throw "Publisher cannot be empty"
+    }
+    if ($publisher -match [regex]::Escape($marker)) {
+        # Validate it is last.
+        if (-not ($publisher.Trim() -match ([regex]::Escape($marker) + "\s*$"))) {
+            throw "Unsigned Publisher marker must be the last field: $marker"
+        }
+        return $publisher
+    }
+    return ($publisher.TrimEnd() + ", " + $marker)
 }
 
 function Ensure-Dir([string] $dir) {
@@ -765,8 +779,7 @@ function Write-AppxManifest(
     [string] $publisherDisplayName,
     [string] $appId,
     [string] $exeName,
-    [string] $protocolName,
-    [string] $actionProtocolName
+    [string] $protocolName
 ) {
     $protocolParams = "connect --uri &quot;%1&quot;"
 
@@ -814,9 +827,10 @@ function Write-AppxManifest(
         Square44x44Logo="Assets\Square44x44Logo.png" />
 
       <Extensions>
-                <!-- App Actions (URI launch) requires registering a protocol-for-results -->
+                <!-- App Actions (URI launch) requires registering a protocol-for-results.
+                     The App Action invocation URI uses the same protocol as the CLI expects (type-agent://...). -->
                 <uap:Extension Category="windows.protocol">
-                    <uap:Protocol Name="$actionProtocolName" ReturnResults="always">
+                    <uap:Protocol Name="$protocolName" ReturnResults="always">
                         <uap:DisplayName>TypeAgent App Action</uap:DisplayName>
                     </uap:Protocol>
                 </uap:Extension>
@@ -871,17 +885,17 @@ function Write-AgentRegistrationJson([string] $path) {
     $json = @{
         manifest_version = "0.1.0"
         version          = "1.0.0"
-        name             = "TypeAgent.TypeAgent"
+        name             = "TypeAgent"
         display_name     = "TypeAgent"
-        description      = "TypeAgent Agent Launcher (requires App Action provider)"
-        icon             = "ms-resource://Files/Assets/Square44x44Logo.png"
+        description      = "TypeAgent"
+        icon             = "https://res.cdn.office.net/s01-tpswwprod/0FA8B8DF7848E8620D8D52285905E3C4E9C89CBEB98B7240B931888A1107F918"
         action_id        = "TypeAgentAction"
     } | ConvertTo-Json -Depth 10
 
     Write-FileUtf8NoBom $path $json
 }
 
-function Write-ActionsRegistrationJson([string] $path, [string] $actionProtocolName) {
+function Write-ActionsRegistrationJson([string] $path, [string] $protocolName) {
     # Minimal URI-launched App Action definition suitable for Agent Launcher scenarios.
     # Note: A real implementation must handle ProtocolForResults activation and read the ValueSet inputs.
     $json = @{
@@ -908,7 +922,7 @@ function Write-ActionsRegistrationJson([string] $path, [string] $actionProtocolN
                     #   connect --uri "<uri>"  ->  ?request=<...>
                     # This matches the semantics expected by packages/cli/src/commands/connect.ts.
                     # Escape $ so PowerShell doesn't interpolate the placeholder.
-                    uri = "${actionProtocolName}://?request=`${prompt.Text}"
+                    uri = "${protocolName}://?request=`${prompt.Text}"
                 }
             }
         )
@@ -965,11 +979,18 @@ if (-not $ExternalLocation) {
 }
 $ExternalLocation = Resolve-FullPath $ExternalLocation
 
+# If we're not signing, use the unsigned identity namespace (Publisher marker OID).
+# This prevents unsigned packages from sharing identity with a signed package.
+$EffectivePublisher = $Publisher
+if (-not $Sign) {
+    $EffectivePublisher = Get-UnsignedPublisher $Publisher
+}
+
 Write-Host "Building SEA executable..." -ForegroundColor Cyan
 $exePath = Build-SeaExe $TsRoot $binDir $ExeName $EntryMode
 
 Write-Host "Writing side-by-side identity manifest..." -ForegroundColor Cyan
-$null = Write-IdentitySideBySideManifest -exePath $exePath -packageName $PackageName -publisher $Publisher -applicationId $AppId
+$null = Write-IdentitySideBySideManifest -exePath $exePath -packageName $PackageName -publisher $EffectivePublisher -applicationId $AppId
 
 Write-Host "Staging identity package..." -ForegroundColor Cyan
 $stageDir = Join-Path $OutDir "msix-stage"
@@ -983,11 +1004,11 @@ Ensure-Dir $assetsDir
 Write-MinimalPng (Join-Path $assetsDir "storelogo.png")
 Write-MinimalPng (Join-Path $assetsDir "Square150x150Logo.png")
 Write-MinimalPng (Join-Path $assetsDir "Square44x44Logo.png")
-Write-ActionsRegistrationJson (Join-Path $assetsDir "registration.json") $ActionProtocolName
+Write-ActionsRegistrationJson (Join-Path $assetsDir "registration.json") $ProtocolName
 Write-AgentRegistrationJson (Join-Path $assetsDir "agentRegistration.json")
 
 $appxManifestPath = Join-Path $stageDir "AppxManifest.xml"
-Write-AppxManifest -path $appxManifestPath -packageName $PackageName -publisher $Publisher -version $Version -displayName $DisplayName -publisherDisplayName $PublisherDisplayName -appId $AppId -exeName $ExeName -protocolName $ProtocolName -actionProtocolName $ActionProtocolName
+Write-AppxManifest -path $appxManifestPath -packageName $PackageName -publisher $EffectivePublisher -version $Version -displayName $DisplayName -publisherDisplayName $PublisherDisplayName -appId $AppId -exeName $ExeName -protocolName $ProtocolName
 
 $makeAppx = Find-WindowsSdkTool "MakeAppx.exe"
 Write-Host "Using MakeAppx: $makeAppx" -ForegroundColor DarkCyan
@@ -1007,13 +1028,19 @@ if ($Sign) {
 
 if ($Register) {
     Write-Host "Registering identity package with external location: $ExternalLocation" -ForegroundColor Cyan
-    Add-AppxPackage -Path $outMsix -ExternalLocation $ExternalLocation -ForceApplicationShutdown
+    if ($Sign) {
+        Add-AppxPackage -Path $outMsix -ExternalLocation $ExternalLocation -ForceApplicationShutdown
+    }
+    else {
+        Add-AppxPackage -Path $outMsix -ExternalLocation $ExternalLocation -ForceApplicationShutdown -AllowUnsigned
+    }
 }
 
 Write-Host "Done." -ForegroundColor Green
 Write-Host "Exe:  $exePath"
 Write-Host "MSIX: $outMsix"
 Write-Host "ExternalLocation to use: $ExternalLocation"
+Write-Host "Publisher (effective): $EffectivePublisher" -ForegroundColor DarkCyan
 
 if (-not $Sign -and -not $Register) {
     Write-Host "Pack-only complete (not signed, not registered)." -ForegroundColor DarkGreen
