@@ -33,6 +33,9 @@ export {
     sessionDir,
 } from "./orchestratorSession.js";
 
+export type { Signal } from "./analyzer.js";
+export { analyzeLine } from "./analyzer.js";
+
 // Register built-in drivers (side-effect imports).
 import "./drivers/copilot.js";
 import "./drivers/claude.js";
