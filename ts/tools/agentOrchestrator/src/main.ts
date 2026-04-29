@@ -11,6 +11,7 @@ import { createSession, saveSession } from "./orchestratorSession.js";
 import type { OrchestratorSession } from "./orchestratorSession.js";
 import { setupAll, worktreePath } from "./worktree.js";
 import { Dashboard } from "./dashboard.js";
+import { createNotifier } from "./notifier.js";
 
 // Side-effect imports: register agent drivers
 import "./drivers/copilot.js";
@@ -62,10 +63,12 @@ async function main(): Promise<void> {
     }
 
     // Start dashboard
+    const notifier = createNotifier(config.notify);
     const dashboard = new Dashboard({
         sessions,
         sessionId: orchSession.id,
         config,
+        notifier,
     });
     dashboard.start();
 

@@ -3,7 +3,8 @@
 
 import type { Session, LaneState } from "./session.js";
 import type { OrchestratorConfig } from "./config.js";
-import { worktreePath, commitCount } from "./worktree.js";
+import type { Notifier } from "./notifier.js";
+import { worktreePath, commitCount, removeWorktree } from "./worktree.js";
 
 // --- ANSI escape helpers ---
 
@@ -62,6 +63,7 @@ export interface DashboardOptions {
     sessions: Session[];
     sessionId: string;
     config: OrchestratorConfig;
+    notifier?: Notifier;
     baseDir?: string;
 }
 
@@ -80,6 +82,7 @@ export class Dashboard {
     private readonly sessionId: string;
     private readonly config: OrchestratorConfig;
     private readonly baseDir: string | undefined;
+    private readonly notifier: Notifier | undefined;
 
     private selectedIndex = 0;
     private focusedIndex: number | undefined = undefined;
@@ -90,6 +93,7 @@ export class Dashboard {
         undefined;
     private inputHandler: ((data: Buffer) => void) | undefined = undefined;
     private _quitting = false;
+    private _waitingForKey = false;
     private _resolveDone: (() => void) | undefined = undefined;
     private readonly _done: Promise<void>;
 
@@ -98,6 +102,7 @@ export class Dashboard {
         this.sessionId = opts.sessionId;
         this.config = opts.config;
         this.baseDir = opts.baseDir;
+        this.notifier = opts.notifier;
         this.commits = new Array(opts.sessions.length).fill(0) as number[];
         this._done = new Promise<void>((resolve) => {
             this._resolveDone = resolve;
@@ -113,6 +118,16 @@ export class Dashboard {
         this.inputHandler = (data: Buffer) => this.handleInput(data);
         process.stdin.on("data", this.inputHandler);
         process.stdout.write(HIDE_CURSOR);
+
+        // Wire up notifier on state transitions
+        for (const session of this.sessions) {
+            session.on(
+                "stateChange",
+                (_name: string, _from: LaneState, to: LaneState) => {
+                    this.onStateChange(session, to);
+                },
+            );
+        }
 
         this.renderTimer = setInterval(() => this.render(), 500);
         this.commitTimer = setInterval(() => {
@@ -210,12 +225,18 @@ export class Dashboard {
 
         // Status bar
         const maxLane = Math.min(n, 9);
-        out += `  ${DIM}[1-${maxLane}] select  [f]ocus  [k]ill  [q]uit${RESET}\n`;
+        out += `  ${DIM}[1-${maxLane}] select  [f]ocus  [k]ill  [d]iff  [p]ush  [c]leanup  [q]uit${RESET}\n`;
 
         process.stdout.write(out);
     }
 
     private handleInput(data: Buffer): void {
+        if (this._waitingForKey) {
+            this._waitingForKey = false;
+            this.render();
+            return;
+        }
+
         if (this.focusedIndex !== undefined) {
             this.handleFocusInput(data);
             return;
@@ -237,6 +258,15 @@ export class Dashboard {
                 break;
             case "k":
                 this.killSelected();
+                break;
+            case "d":
+                void this.diffSelected();
+                break;
+            case "p":
+                void this.pushSelected();
+                break;
+            case "c":
+                void this.cleanupSelected();
                 break;
             case "q":
                 void this.quit();
@@ -310,6 +340,106 @@ export class Dashboard {
         if (st === "RUNNING" || st === "BLOCKED") {
             session.kill();
         }
+    }
+
+    private async diffSelected(): Promise<void> {
+        const session = this.sessions[this.selectedIndex];
+        const st = session.info.state;
+        const postStates: LaneState[] = [
+            "DONE",
+            "FAILED",
+            "KILLED",
+            "TIMED_OUT",
+            "PUSHED",
+            "ABANDONED",
+        ];
+        if (!postStates.includes(st)) {
+            return;
+        }
+        try {
+            const output = await session.diff();
+            // Temporarily show diff in focus-like view
+            process.stdout.write(CLEAR);
+            process.stdout.write(
+                `${BOLD}Diff: ${session.info.name}${RESET}  ${DIM}(press any key to return)${RESET}\n`,
+            );
+            process.stdout.write(`${DIM}${"─".repeat(60)}${RESET}\n`);
+            process.stdout.write(output + "\n");
+            // Wait for any keypress to return
+            this._waitingForKey = true;
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`Diff failed: ${msg}\n`);
+        }
+    }
+
+    private async pushSelected(): Promise<void> {
+        const session = this.sessions[this.selectedIndex];
+        if (session.info.state !== "DONE") {
+            return;
+        }
+        try {
+            await session.push();
+            this.render();
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            process.stderr.write(`Push failed: ${msg}\n`);
+        }
+    }
+
+    private async cleanupSelected(): Promise<void> {
+        const session = this.sessions[this.selectedIndex];
+        const st = session.info.state;
+        const cleanupStates: LaneState[] = [
+            "DONE",
+            "FAILED",
+            "PUSHED",
+            "KILLED",
+            "TIMED_OUT",
+        ];
+        if (!cleanupStates.includes(st)) {
+            return;
+        }
+        const lane = this.config.lanes[this.selectedIndex];
+        const wtPath = worktreePath(
+            this.config.repo,
+            lane.name,
+            this.sessionId,
+            this.baseDir,
+        );
+        try {
+            await removeWorktree(this.config.repo, wtPath, lane.branch);
+        } catch {
+            // Worktree may already be removed
+        }
+        session.abandon();
+        this.render();
+    }
+
+    private onStateChange(session: Session, to: LaneState): void {
+        if (this.notifier === undefined) {
+            return;
+        }
+        const eventMap: Partial<
+            Record<LaneState, "blocked" | "failed" | "done">
+        > = {
+            BLOCKED: "blocked",
+            FAILED: "failed",
+            DONE: "done",
+        };
+        const event = eventMap[to];
+        if (event === undefined) {
+            return;
+        }
+        const filter = this.config.notify.on;
+        if (!filter.includes(event)) {
+            return;
+        }
+        void this.notifier.notify({
+            lane: session.info.name,
+            event,
+            message: `Lane "${session.info.name}" is now ${to}`,
+        });
     }
 
     private async updateCommits(): Promise<void> {

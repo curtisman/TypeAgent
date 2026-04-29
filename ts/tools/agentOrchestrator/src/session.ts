@@ -2,10 +2,14 @@
 // Licensed under the MIT License.
 
 import { EventEmitter } from "events";
+import { execFile as execFileCb } from "child_process";
+import { promisify } from "util";
 import * as pty from "node-pty";
 import type { LaneConfig } from "./config.js";
 import type { AgentDriver } from "./driver.js";
 import { analyzeLine } from "./analyzer.js";
+
+const execFile = promisify(execFileCb);
 
 /** Possible states in the lane state machine. */
 export type LaneState =
@@ -64,6 +68,7 @@ export class Session extends EventEmitter {
     private readonly lane: LaneConfig;
     private readonly driver: AgentDriver;
     private readonly wtPath: string;
+    private readonly baseBranch: string;
 
     private _state: LaneState = "IDLE";
     private _elapsedMs: number = 0;
@@ -82,12 +87,13 @@ export class Session extends EventEmitter {
         lane: LaneConfig,
         driver: AgentDriver,
         wtPath: string,
-        _baseBranch: string,
+        baseBranch: string,
     ) {
         super();
         this.lane = lane;
         this.driver = driver;
         this.wtPath = wtPath;
+        this.baseBranch = baseBranch;
         this._timeoutMs = parseTimeout(lane.timeout);
     }
 
@@ -206,7 +212,62 @@ export class Session extends EventEmitter {
         this.startProcess(spec);
     }
 
+    /**
+     * Show diff summary for the lane: commit log + diffstat.
+     * Can be called in any post-exit state.
+     */
+    async diff(): Promise<string> {
+        this.assertStates(
+            "diff",
+            "DONE",
+            "FAILED",
+            "KILLED",
+            "TIMED_OUT",
+            "PUSHED",
+            "ABANDONED",
+        );
+        const range = `${this.baseBranch}..HEAD`;
+        const log = await this.execGitInWorktree(["log", "--oneline", range]);
+        const stat = await this.execGitInWorktree(["diff", "--stat", range]);
+        return [log, "", stat].join("\n");
+    }
+
+    /**
+     * Push the lane's branch to a remote.
+     * Transitions DONE -> PUSHED.
+     */
+    async push(remote: string = "origin"): Promise<void> {
+        this.assertStates("push", "DONE");
+        await this.execGitInWorktree([
+            "push",
+            remote,
+            `HEAD:${this.lane.branch}`,
+        ]);
+        this.transition("PUSHED");
+    }
+
+    /**
+     * Mark lane as abandoned.
+     * Transitions DONE/FAILED/PUSHED/KILLED/TIMED_OUT -> ABANDONED.
+     */
+    abandon(): void {
+        this.assertStates(
+            "abandon",
+            "DONE",
+            "FAILED",
+            "PUSHED",
+            "KILLED",
+            "TIMED_OUT",
+        );
+        this.transition("ABANDONED");
+    }
+
     // --- Internal helpers ---
+
+    private async execGitInWorktree(args: string[]): Promise<string> {
+        const { stdout } = await execFile("git", args, { cwd: this.wtPath });
+        return stdout.trimEnd();
+    }
 
     private startProcess(spec: import("./driver.js").SpawnSpec): void {
         this._exitCode = undefined;

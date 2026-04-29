@@ -39,6 +39,9 @@ export { analyzeLine } from "./analyzer.js";
 export type { DashboardOptions } from "./dashboard.js";
 export { Dashboard } from "./dashboard.js";
 
+export type { NotifyEvent, Notifier } from "./notifier.js";
+export { createNotifier } from "./notifier.js";
+
 // Register built-in drivers (side-effect imports).
 import "./drivers/copilot.js";
 import "./drivers/claude.js";
