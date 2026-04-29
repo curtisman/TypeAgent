@@ -408,74 +408,90 @@ dashboard (using `interactiveApp`'s `ANSI` constants and
 `EnhancedSpinner`) is faster to ship and validates the core
 abstractions before investing in the TUI.
 
-#### Chunk A: scaffold and config
+#### Chunk A: scaffold and config — PR 1 start
 
 Set up the package and load lane definitions. No runtime behavior
 yet; the output is a validated config object and a buildable package.
 
-| Item | Description                                                                                 |
-| ---- | ------------------------------------------------------------------------------------------- |
-| A.1  | **Decision:** align `node-pty` version with `coderWrapper` to avoid duplicate native builds |
-| A.2  | **Decision:** resolve `simple-git` vs `execFile` (dependency table lists both; pick one)    |
-| A.3  | Package scaffold (`tools/agentOrchestrator/`)                                               |
-| A.4  | Lane config loader (YAML)                                                                   |
+| Item | Description                                                                                 | Commit |
+| ---- | ------------------------------------------------------------------------------------------- | ------ |
+| A.1  | **Decision:** align `node-pty` version with `coderWrapper` to avoid duplicate native builds |        |
+| A.2  | **Decision:** resolve `simple-git` vs `execFile` (dependency table lists both; pick one)    |        |
+| A.3  | Package scaffold (`tools/agentOrchestrator/`)                                               | ✓      |
+| A.4  | Lane config loader (YAML)                                                                   | ✓      |
 
-#### Chunk B: worktree manager
+#### Chunk B: worktree manager — PR 1 end
 
 Create, list, and remove git worktrees. Depends on Chunk A for the
 config (branch names, repo root).
 
-| Item | Description                                                                                                                             |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| B.1  | **Decision:** define worktree setup failure modes (branch exists, dirty tree, agent not in PATH) and fail-fast vs `--continue-on-error` |
-| B.2  | **Decision:** serialize worktree mutations to avoid git lock conflicts during concurrent cleanup + retry                                |
-| B.3  | Worktree manager                                                                                                                        |
+| Item | Description                                                                                                                             | Commit |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| B.1  | **Decision:** define worktree setup failure modes (branch exists, dirty tree, agent not in PATH) and fail-fast vs `--continue-on-error` |        |
+| B.2  | **Decision:** serialize worktree mutations to avoid git lock conflicts during concurrent cleanup + retry                                |        |
+| B.3  | Worktree manager                                                                                                                        | ✓      |
 
-#### Chunk C: session manager and agent driver
+#### Chunk C: session manager and agent driver — PR 2 start
 
 Spawn agent processes in ptys, manage the lane state machine, handle
 timeouts and shutdown. Depends on Chunk B for worktree paths.
 
-| Item | Description                                                                                        |
-| ---- | -------------------------------------------------------------------------------------------------- |
-| C.1  | **Decision:** add KILLED and TIMED_OUT terminal states to the state machine (distinct from FAILED) |
-| C.2  | **Decision:** define timeout behavior (kill? notify? which state?)                                 |
-| C.3  | **Decision:** define pause/resume semantics (SIGSTOP/SIGCONT?) or remove from Phase 1 UI mockup    |
-| C.4  | **Decision:** define SIGINT/SIGTERM teardown sequence for graceful shutdown                        |
-| C.5  | Agent driver interface + `copilot` driver                                                          |
-| C.6  | Session manager (node-pty + state machine)                                                         |
+| Item | Description                                                                                        | Commit |
+| ---- | -------------------------------------------------------------------------------------------------- | ------ |
+| C.1  | **Decision:** add KILLED and TIMED_OUT terminal states to the state machine (distinct from FAILED) |        |
+| C.2  | **Decision:** define timeout behavior (kill? notify? which state?)                                 |        |
+| C.3  | **Decision:** define pause/resume semantics (SIGSTOP/SIGCONT?) or remove from Phase 1 UI mockup    |        |
+| C.4  | **Decision:** define SIGINT/SIGTERM teardown sequence for graceful shutdown                        |        |
+| C.5  | Agent driver interface + `copilot` driver                                                          | ✓      |
+| C.6  | Session manager (node-pty + state machine)                                                         | ✓      |
 
-#### Chunk D: output analyzer
+> **🧪 Real-life test point 1:** After C.6, you can smoke-test a
+> single real agent (e.g. `copilot`) spawned in a real worktree.
+> No dashboard yet, just raw pty output to verify the agent receives
+> the prompt, runs, and exits with the correct state transition.
+
+#### Chunk D: output analyzer — PR 2 end
 
 Classify pty output lines into signals (progress, blocked, error,
 milestone). Depends on Chunk C for the session output stream.
 
-| Item | Description                                                                                                     |
-| ---- | --------------------------------------------------------------------------------------------------------------- |
-| D.1  | **Decision:** refine BLOCKED detection heuristic (silence alone vs silence + approval pattern in recent output) |
-| D.2  | Output analyzer (regex v1)                                                                                      |
+| Item | Description                                                                                                     | Commit |
+| ---- | --------------------------------------------------------------------------------------------------------------- | ------ |
+| D.1  | **Decision:** refine BLOCKED detection heuristic (silence alone vs silence + approval pattern in recent output) |        |
+| D.2  | Output analyzer (regex v1)                                                                                      | ✓      |
 
-#### Chunk E: text-mode dashboard
+#### Chunk E: text-mode dashboard — PR 3 start
 
 Render lane status to the terminal. Depends on Chunks C and D for
 session state and analyzer signals.
 
-| Item | Description                                                                                                             |
-| ---- | ----------------------------------------------------------------------------------------------------------------------- |
-| E.1  | **Decision:** define lane selection UX for text-mode focus (number key, arrow keys, etc.)                               |
-| E.2  | **Decision:** define focus-mode escape sequence for text-mode (how to distinguish pty input from orchestrator commands) |
-| E.3  | Text-mode dashboard (ANSI status lines, no Ink)                                                                         |
+| Item | Description                                                                                                             | Commit |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- | ------ |
+| E.1  | **Decision:** define lane selection UX for text-mode focus (number key, arrow keys, etc.)                               |        |
+| E.2  | **Decision:** define focus-mode escape sequence for text-mode (how to distinguish pty input from orchestrator commands) |        |
+| E.3  | Text-mode dashboard (ANSI status lines, no Ink)                                                                         | ✓      |
 
-#### Chunk F: post-completion, notifications, and e2e test
+> **🧪 Real-life test point 2:** After E.3, you can run multiple
+> real agents in parallel and watch them via the text dashboard.
+> Focus a lane, observe status transitions, kill stuck lanes. No
+> post-completion actions yet (diff/push/cleanup come in Chunk F).
+
+#### Chunk F: post-completion, notifications, and e2e test — PR 3 end
 
 Wire up the remaining runtime features and validate everything
 end-to-end. Depends on Chunks B-E.
 
-| Item | Description                                            |
-| ---- | ------------------------------------------------------ |
-| F.1  | Post-completion actions (diff, push, cleanup)          |
-| F.2  | Notifier (ntfy channel only)                           |
-| F.3  | End-to-end test: 3 lanes with mock agent (echo script) |
+| Item | Description                                            | Commit |
+| ---- | ------------------------------------------------------ | ------ |
+| F.1  | Post-completion actions (diff, push, cleanup)          | ✓      |
+| F.2  | Notifier (ntfy channel only)                           | ✓      |
+| F.3  | End-to-end test: 3 lanes with mock agent (echo script) | ✓      |
+
+> **🧪 Real-life test point 3 (full MVP):** After F.3, the
+> orchestrator is feature-complete for Phase 1. Run 3+ real agent
+> lanes, monitor via the dashboard, review diffs, push branches,
+> and clean up worktrees. This is the manual acceptance test
+> described in the Verification section.
 
 #### Phase 1 chunk dependency graph
 
@@ -493,46 +509,46 @@ A (scaffold/config)
 Replace the text-mode dashboard with Ink. Adds focus mode (full pty
 replay + type-through), better layout, and keyboard shortcuts.
 
-#### Chunk G: Ink dashboard
+#### Chunk G: Ink dashboard — PR 4 start
 
-| Item | Description                                                                                  |
-| ---- | -------------------------------------------------------------------------------------------- |
-| G.1  | Add `ink` + `react` dependencies                                                             |
-| G.2  | `<Dashboard>` + `<LaneCard>` components                                                      |
-| G.3  | `<FocusView>` with pty replay and type-through                                               |
-| G.4  | `<StatusBar>` with key bindings                                                              |
-| G.5  | **Decision:** require push confirmation (show branch + remote, y/n) or allow single-key push |
+| Item | Description                                                                                  | Commit |
+| ---- | -------------------------------------------------------------------------------------------- | ------ |
+| G.1  | Add `ink` + `react` dependencies                                                             |        |
+| G.2  | `<Dashboard>` + `<LaneCard>` components                                                      | ✓      |
+| G.3  | `<FocusView>` with pty replay and type-through                                               | ✓      |
+| G.4  | `<StatusBar>` with key bindings                                                              | ✓      |
+| G.5  | **Decision:** require push confirmation (show branch + remote, y/n) or allow single-key push |        |
 
-#### Chunk H: desktop notifications
+#### Chunk H: desktop notifications — PR 4 end
 
-| Item | Description                  |
-| ---- | ---------------------------- |
-| H.1  | Desktop notification channel |
+| Item | Description                  | Commit |
+| ---- | ---------------------------- | ------ |
+| H.1  | Desktop notification channel | ✓      |
 
 ### Phase 3: polish
 
-#### Chunk I: additional drivers and notification channels
+#### Chunk I: additional drivers and notification channels — PR 5
 
-| Item | Description                  |
-| ---- | ---------------------------- |
-| I.1  | `claude` agent driver        |
-| I.2  | Webhook notification channel |
+| Item | Description                  | Commit |
+| ---- | ---------------------------- | ------ |
+| I.1  | `claude` agent driver        | ✓      |
+| I.2  | Webhook notification channel | ✓      |
 
-#### Chunk J: advanced lane management
+#### Chunk J: advanced lane management — PR 6
 
-| Item | Description                                                |
-| ---- | ---------------------------------------------------------- |
-| J.1  | Lane dependency ordering (start L4 only after L2 finishes) |
-| J.2  | Auto-cleanup of worktrees on exit                          |
-| J.3  | Retry failed lane with modified prompt                     |
+| Item | Description                                                | Commit |
+| ---- | ---------------------------------------------------------- | ------ |
+| J.1  | Lane dependency ordering (start L4 only after L2 finishes) | ✓      |
+| J.2  | Auto-cleanup of worktrees on exit                          | ✓      |
+| J.3  | Retry failed lane with modified prompt                     | ✓      |
 
-#### Chunk K: config and analyzer hardening
+#### Chunk K: config and analyzer hardening — PR 7
 
-| Item | Description                                                                                                        |
-| ---- | ------------------------------------------------------------------------------------------------------------------ |
-| K.1  | Config validation with clear error messages                                                                        |
-| K.2  | **Decision:** tighten output analyzer patterns to reduce false positives (anchor regexes, require word boundaries) |
-| K.3  | **Decision:** support inline `prompt:` key in lane config (alternative to `prompt-file:` for short prompts)        |
+| Item | Description                                                                                                        | Commit |
+| ---- | ------------------------------------------------------------------------------------------------------------------ | ------ |
+| K.1  | Config validation with clear error messages                                                                        | ✓      |
+| K.2  | **Decision:** tighten output analyzer patterns to reduce false positives (anchor regexes, require word boundaries) |        |
+| K.3  | **Decision:** support inline `prompt:` key in lane config (alternative to `prompt-file:` for short prompts)        |        |
 
 ## File layout
 
