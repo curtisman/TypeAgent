@@ -275,8 +275,20 @@ describe("worktree", () => {
             cwd: repoDir,
         });
 
+        // Capture the expected stderr warning
+        const warnings: string[] = [];
+        const origWrite = process.stderr.write.bind(process.stderr);
+        process.stderr.write = ((chunk: string | Uint8Array) => {
+            warnings.push(String(chunk));
+            return true;
+        }) as typeof process.stderr.write;
+
         // Should not throw; lane-B should still be cleaned up
         await teardownAll(config, SESSION, baseDir);
+
+        process.stderr.write = origWrite;
+
+        expect(warnings.some((w) => w.includes('lane "lane-A"'))).toBe(true);
 
         const wtPathB = worktreePath(repoDir, "lane-B", SESSION, baseDir);
         expect(existsSync(wtPathB)).toBe(false);
