@@ -339,7 +339,10 @@ per-lane worktrees.
   best-effort (continues past errors).
 
 Worktrees are created under a central dotdir:
-`~/.agent-orchestrator/<absolute-repo-path>/<lane-name>/`.
+`~/.agent-orchestrator/<absolute-repo-path>/<session-id>/<lane-name>/`.
+Each orchestrator run gets a unique session ID (timestamp-based:
+`YYYYMMDD-HHmmss`). Session state is persisted at
+`~/.agent-orchestrator/<absolute-repo-path>/<session-id>/session.json`.
 The full absolute repo path (leading `/` stripped) is used as the
 directory structure so worktrees trivially map back to their source
 repo. The base directory (`~/.agent-orchestrator`) is configurable
@@ -494,6 +497,7 @@ timeouts and shutdown. Depends on Chunk B for worktree paths.
 | C.4  | **Decision:** define SIGINT/SIGTERM teardown sequence for graceful shutdown                        |        |
 | C.5  | Agent driver interface + `copilot` driver                                                          | ✓      |
 | C.6  | Session manager (node-pty + state machine)                                                         | ✓      |
+| C.7  | Orchestrator session persistence (save/load/list session state)                                    | ✓      |
 
 > **🧪 Real-life test point 1:** After C.6, you can smoke-test a
 > single real agent (e.g. `copilot`) spawned in a real worktree.

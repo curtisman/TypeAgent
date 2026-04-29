@@ -61,6 +61,8 @@ function testConfig(
     };
 }
 
+const SESSION = "20260101-120000";
+
 describe("worktree", () => {
     let repoDir: string;
     let baseDir: string;
@@ -85,13 +87,20 @@ describe("worktree", () => {
         }
     });
 
-    it("worktreePath returns dotdir path", () => {
-        const result = worktreePath("/home/user/src/repo", "L2-core", baseDir);
-        expect(result).toBe(resolve(baseDir, "home/user/src/repo", "L2-core"));
+    it("worktreePath returns dotdir path with session ID", () => {
+        const result = worktreePath(
+            "/home/user/src/repo",
+            "L2-core",
+            SESSION,
+            baseDir,
+        );
+        expect(result).toBe(
+            resolve(baseDir, "home/user/src/repo", SESSION, "L2-core"),
+        );
     });
 
     it("creates a worktree with a new branch", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
 
         expect(existsSync(wtPath)).toBe(true);
@@ -105,7 +114,7 @@ describe("worktree", () => {
     });
 
     it("created worktree is on the correct branch", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
 
         const branch = execFileSync(
@@ -119,7 +128,7 @@ describe("worktree", () => {
     });
 
     it("removes a worktree", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
         await removeWorktree(repoDir, wtPath);
 
@@ -131,7 +140,7 @@ describe("worktree", () => {
     });
 
     it("removes a worktree and deletes its branch", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
         await removeWorktree(repoDir, wtPath, "test-branch");
 
@@ -144,7 +153,7 @@ describe("worktree", () => {
     });
 
     it("removes a worktree without deleting branch", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
         await removeWorktree(repoDir, wtPath);
 
@@ -157,7 +166,7 @@ describe("worktree", () => {
     });
 
     it("lists worktrees", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
 
         const wts = await listWorktrees(repoDir);
@@ -173,7 +182,7 @@ describe("worktree", () => {
     });
 
     it("commitCount returns 0 for fresh worktree", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
 
         const count = await commitCount(wtPath, "main");
@@ -181,7 +190,7 @@ describe("worktree", () => {
     });
 
     it("commitCount returns N after N commits", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await createWorktree(repoDir, "main", "test-branch", wtPath);
 
         makeCommit(wtPath, "file1.txt");
@@ -198,10 +207,10 @@ describe("worktree", () => {
             { name: "lane-B", branch: "br-B" },
         ]);
 
-        await setupAll(config, baseDir);
+        await setupAll(config, SESSION, baseDir);
 
         for (const lane of config.lanes) {
-            const wtPath = worktreePath(repoDir, lane.name, baseDir);
+            const wtPath = worktreePath(repoDir, lane.name, SESSION, baseDir);
             expect(existsSync(wtPath)).toBe(true);
         }
 
@@ -223,10 +232,10 @@ describe("worktree", () => {
             { name: "lane-B", branch: "br-B" },
         ]);
 
-        await expect(setupAll(config, baseDir)).rejects.toThrow();
+        await expect(setupAll(config, SESSION, baseDir)).rejects.toThrow();
 
         // lane-A should have been rolled back
-        const wtPathA = worktreePath(repoDir, "lane-A", baseDir);
+        const wtPathA = worktreePath(repoDir, "lane-A", SESSION, baseDir);
         expect(existsSync(wtPathA)).toBe(false);
     });
 
@@ -235,12 +244,12 @@ describe("worktree", () => {
             { name: "lane-A", branch: "br-A" },
             { name: "lane-B", branch: "br-B" },
         ]);
-        await setupAll(config, baseDir);
+        await setupAll(config, SESSION, baseDir);
 
-        await teardownAll(config, baseDir);
+        await teardownAll(config, SESSION, baseDir);
 
         for (const lane of config.lanes) {
-            const wtPath = worktreePath(repoDir, lane.name, baseDir);
+            const wtPath = worktreePath(repoDir, lane.name, SESSION, baseDir);
             expect(existsSync(wtPath)).toBe(false);
         }
 
@@ -258,23 +267,23 @@ describe("worktree", () => {
             { name: "lane-A", branch: "br-A" },
             { name: "lane-B", branch: "br-B" },
         ]);
-        await setupAll(config, baseDir);
+        await setupAll(config, SESSION, baseDir);
 
         // Manually remove lane-A's worktree so teardown hits an error on it
-        const wtPathA = worktreePath(repoDir, "lane-A", baseDir);
+        const wtPathA = worktreePath(repoDir, "lane-A", SESSION, baseDir);
         execFileSync("git", ["worktree", "remove", wtPathA, "--force"], {
             cwd: repoDir,
         });
 
         // Should not throw; lane-B should still be cleaned up
-        await teardownAll(config, baseDir);
+        await teardownAll(config, SESSION, baseDir);
 
-        const wtPathB = worktreePath(repoDir, "lane-B", baseDir);
+        const wtPathB = worktreePath(repoDir, "lane-B", SESSION, baseDir);
         expect(existsSync(wtPathB)).toBe(false);
     });
 
     it("throws on non-existent base branch", async () => {
-        const wtPath = worktreePath(repoDir, "test-lane", baseDir);
+        const wtPath = worktreePath(repoDir, "test-lane", SESSION, baseDir);
         await expect(
             createWorktree(repoDir, "nonexistent-base", "new-branch", wtPath),
         ).rejects.toThrow(/nonexistent-base/);

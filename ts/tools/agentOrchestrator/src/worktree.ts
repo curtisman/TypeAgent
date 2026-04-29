@@ -38,19 +38,20 @@ async function execGit(args: string[], cwd: string): Promise<string> {
 /**
  * Compute the worktree directory path for a lane.
  *
- * Convention: ~/.agent-orchestrator/<absolute-repo-path>/<lane-name>/
+ * Convention: ~/.agent-orchestrator/<absolute-repo-path>/<session-id>/<lane-name>/
  * The leading "/" is stripped so path.join produces a relative sub-path.
  */
 export function worktreePath(
     repoRoot: string,
     laneName: string,
+    sessionId: string,
     baseDir?: string,
 ): string {
     const base = baseDir ?? resolve(homedir(), ".agent-orchestrator");
     const absRepo = resolve(repoRoot);
     // Strip leading "/" so path.join doesn't treat it as absolute
     const repoRelative = absRepo.startsWith("/") ? absRepo.slice(1) : absRepo;
-    return resolve(base, repoRelative, laneName);
+    return resolve(base, repoRelative, sessionId, laneName);
 }
 
 /**
@@ -151,12 +152,13 @@ export async function commitCount(
  */
 export async function setupAll(
     config: OrchestratorConfig,
+    sessionId: string,
     baseDir?: string,
 ): Promise<void> {
     const created: Array<{ wtPath: string; branch: string }> = [];
 
     for (const lane of config.lanes) {
-        const wtPath = worktreePath(config.repo, lane.name, baseDir);
+        const wtPath = worktreePath(config.repo, lane.name, sessionId, baseDir);
         try {
             await createWorktree(config.repo, config.base, lane.branch, wtPath);
             created.push({ wtPath, branch: lane.branch });
@@ -180,10 +182,11 @@ export async function setupAll(
  */
 export async function teardownAll(
     config: OrchestratorConfig,
+    sessionId: string,
     baseDir?: string,
 ): Promise<void> {
     for (const lane of config.lanes) {
-        const wtPath = worktreePath(config.repo, lane.name, baseDir);
+        const wtPath = worktreePath(config.repo, lane.name, sessionId, baseDir);
         try {
             await removeWorktree(config.repo, wtPath, lane.branch);
         } catch (err) {
