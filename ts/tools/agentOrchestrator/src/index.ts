@@ -36,6 +36,9 @@ export {
 export type { Signal } from "./analyzer.js";
 export { analyzeLine } from "./analyzer.js";
 
+export type { DashboardOptions } from "./dashboard.js";
+export { Dashboard } from "./dashboard.js";
+
 // Register built-in drivers (side-effect imports).
 import "./drivers/copilot.js";
 import "./drivers/claude.js";

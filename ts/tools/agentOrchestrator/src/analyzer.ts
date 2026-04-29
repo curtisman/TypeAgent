@@ -11,6 +11,12 @@ export type Signal =
 
 // Patterns tested in priority order: blocked > error > milestone > progress.
 
+/** Strip ANSI escape sequences so regexes match colored pty output. */
+const ANSI_RE = /\x1b\[[0-9;]*[a-zA-Z]/g;
+function stripAnsi(s: string): string {
+    return s.replace(ANSI_RE, "");
+}
+
 const BLOCKED_RE = /permission|approve|confirm|do you want|y\/n|\byes\/no\b/i;
 
 const ERROR_RE = /\bError\b|FAIL|\bpanic\b|Traceback/;
@@ -28,28 +34,29 @@ const PROGRESS_RE =
  * Priority: blocked > error > milestone > progress > noise.
  */
 export function analyzeLine(line: string): Signal {
-    if (line.length === 0) {
+    const clean = stripAnsi(line);
+    if (clean.length === 0) {
         return { kind: "noise" };
     }
 
     let m: RegExpExecArray | null;
 
-    m = BLOCKED_RE.exec(line);
+    m = BLOCKED_RE.exec(clean);
     if (m !== null) {
         return { kind: "blocked", reason: m[0] };
     }
 
-    m = ERROR_RE.exec(line);
+    m = ERROR_RE.exec(clean);
     if (m !== null) {
         return { kind: "error", message: m[0] };
     }
 
-    m = MILESTONE_RE.exec(line);
+    m = MILESTONE_RE.exec(clean);
     if (m !== null) {
         return { kind: "milestone", description: m[0] };
     }
 
-    m = PROGRESS_RE.exec(line);
+    m = PROGRESS_RE.exec(clean);
     if (m !== null) {
         return { kind: "progress", summary: m[0] };
     }

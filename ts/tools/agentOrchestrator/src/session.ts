@@ -5,6 +5,7 @@ import { EventEmitter } from "events";
 import * as pty from "node-pty";
 import type { LaneConfig } from "./config.js";
 import type { AgentDriver } from "./driver.js";
+import { analyzeLine } from "./analyzer.js";
 
 /** Possible states in the lane state machine. */
 export type LaneState =
@@ -40,6 +41,8 @@ export interface SessionInfo {
     readonly sessionId: string | undefined;
     /** Exit code (set after process exit). */
     readonly exitCode: number | undefined;
+    /** Last non-noise signal kind from the output analyzer. */
+    readonly lastSignalKind: string | undefined;
 }
 
 /** Maximum number of output lines kept in the ring buffer. */
@@ -68,6 +71,7 @@ export class Session extends EventEmitter {
     private _recentOutput: string[] = [];
     private _sessionId: string | undefined = undefined;
     private _exitCode: number | undefined = undefined;
+    private _lastSignalKind: string | undefined = undefined;
     private _partialLine: string = "";
     private _ptyProcess: pty.IPty | undefined = undefined;
     private _silenceTimer: ReturnType<typeof setTimeout> | undefined =
@@ -100,6 +104,7 @@ export class Session extends EventEmitter {
             recentOutput: this._recentOutput,
             sessionId: this._sessionId,
             exitCode: this._exitCode,
+            lastSignalKind: this._lastSignalKind,
         };
     }
 
@@ -245,6 +250,21 @@ export class Session extends EventEmitter {
         for (const line of chunks) {
             this.pushOutput(line);
             this.emit("output", this.lane.name, line);
+
+            // Classify output for BLOCKED detection
+            const signal = analyzeLine(line);
+            if (signal.kind !== "noise") {
+                this._lastSignalKind = signal.kind;
+            }
+            if (signal.kind === "blocked" && this._state === "RUNNING") {
+                this.transition("BLOCKED");
+            } else if (
+                this._state === "BLOCKED" &&
+                signal.kind !== "blocked" &&
+                signal.kind !== "noise"
+            ) {
+                this.transition("RUNNING");
+            }
         }
 
         // Reset silence timer on any output
