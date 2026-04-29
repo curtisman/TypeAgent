@@ -82,24 +82,30 @@ operator drives the next steps:
 
 - **Review** the diff (`git log --oneline <base>..HEAD` + optional
   `git diff <base>..HEAD` in a pager).
+- **Resume** the lane to iterate on the work. If the agent driver
+  supports session resume (both Copilot CLI and Claude Code do),
+  the agent is re-spawned with `--continue` or `--resume <id>` so
+  it has full conversation context. The operator can provide
+  follow-up instructions via the prompt.
 - **Push** the lane's branch when satisfied.
-- **Retry** a failed lane with the same or a modified prompt.
+- **Retry** a failed lane from scratch with the same or modified prompt.
 - **Cleanup** worktrees for lanes that are pushed or abandoned.
 
 The dashboard offers these as keybindings on completed lanes:
-`[d]iff`, `[p]ush`, `[r]etry`, `[c]leanup`.
+`[d]iff`, `[r]esume`, `[p]ush`, `[R]etry`, `[c]leanup`.
 
 ### Lifecycle summary
 
-| Phase    | What the agent does                | What the orchestrator does               | What the operator does          |
-| -------- | ---------------------------------- | ---------------------------------------- | ------------------------------- |
-| Start    | -                                  | Create worktrees, spawn agents           | Launch, watch                   |
-| Running  | Write code, commit, test, self-fix | Observe, classify output, track commits  | Glance at dashboard             |
-| Blocked  | Wait for approval                  | Detect silence / approval prompt, notify | Focus lane, type answer         |
-| Error    | Try to self-fix                    | Surface error signal                     | Watch, optionally intervene     |
-| Done     | Exit 0                             | Show summary, offer post-actions         | Review diff, push, cleanup      |
-| Failed   | Exit non-zero                      | Show summary, offer retry                | Review output, retry or abandon |
-| All done | -                                  | Show aggregate summary                   | Push branches, cleanup, quit    |
+| Phase    | What the agent does                | What the orchestrator does               | What the operator does              |
+| -------- | ---------------------------------- | ---------------------------------------- | ----------------------------------- |
+| Start    | -                                  | Create worktrees, spawn agents           | Launch, watch                       |
+| Running  | Write code, commit, test, self-fix | Observe, classify output, track commits  | Glance at dashboard                 |
+| Blocked  | Wait for approval                  | Detect silence / approval prompt, notify | Focus lane, type answer             |
+| Error    | Try to self-fix                    | Surface error signal                     | Watch, optionally intervene         |
+| Done     | Exit 0                             | Show summary, offer post-actions         | Review diff, resume/push/cleanup    |
+| Resume   | Continues with context             | Re-spawn with session resume             | Provide follow-up instructions      |
+| Failed   | Exit non-zero                      | Show summary, offer retry/resume         | Review output, resume/retry/abandon |
+| All done | -                                  | Show aggregate summary                   | Push branches, cleanup, quit        |
 
 ## Architecture
 
@@ -186,6 +192,21 @@ interface AgentDriver {
   /** Build the spawn command + args for this agent. */
   buildCommand(config: LaneConfig): SpawnSpec;
 
+  /**
+   * Build a resume command that restores the agent's session
+   * context. Returns null if the driver does not support resume.
+   * @param sessionId - Captured from the agent's exit output.
+   * @param followUp - Optional follow-up instructions from the operator.
+   */
+  buildResumeCommand(
+    config: LaneConfig,
+    sessionId?: string,
+    followUp?: string,
+  ): SpawnSpec | null;
+
+  /** Whether this driver supports session resume. */
+  readonly supportsSessionResume: boolean;
+
   /** Whether this driver supports the --allow-tool style pre-auth. */
   readonly supportsToolAllowList: boolean;
 }
@@ -196,6 +217,13 @@ interface SpawnSpec {
   env?: Record<string, string>;
 }
 ```
+
+Resume commands per driver:
+
+| Driver    | Resume command                                     | Session ID source       |
+| --------- | -------------------------------------------------- | ----------------------- |
+| `copilot` | `copilot --resume <id>` (or `--continue` if no ID) | Printed at session exit |
+| `claude`  | `claude --resume <id>` (or `--continue` if no ID)  | Printed at session exit |
 
 v1 ships two drivers:
 
@@ -222,17 +250,23 @@ Owns the lifecycle of one lane. Wraps `node-pty` (following the
        BLOCKED    DONE / FAILED
           │          │
      user sends      │  user actions:
-     input / resume  │  [d]iff, [p]ush,
-          │          │  [r]etry, [c]leanup
+     input / resume  │  [d]iff, [r]esume, [p]ush,
+          │          │  [R]etry, [c]leanup
           ▼          │
-       RUNNING       ▼
+       RUNNING ◄─────┤ resume (--continue/--resume <id>)
+                     │ retry  (fresh spawn)
+                     ▼
                   PUSHED / ABANDONED
 ```
 
 Terminal states: `PUSHED`, `ABANDONED`. A lane in `DONE` or `FAILED`
-can transition to `PUSHED` (operator reviewed and pushed the branch)
-or `ABANDONED` (operator decided to discard). `FAILED` lanes can also
-transition back to `RUNNING` via retry.
+can transition to:
+
+- `RUNNING` via **resume** (re-spawn with session context using
+  `--continue` or `--resume <sessionId>`), or **retry** (fresh
+  spawn, no session context).
+- `PUSHED` (operator reviewed and pushed the branch).
+- `ABANDONED` (operator decided to discard).
 
 Key responsibilities:
 
@@ -245,7 +279,12 @@ Key responsibilities:
 - Expose `kill()` for force-termination.
 - Expose `diff(base)` for post-completion review (`git log` + `git diff`).
 - Expose `push(remote, branch)` for post-completion push.
-- Expose `retry(prompt?)` for re-spawning a failed lane.
+- Expose `resume(followUp?)` for re-spawning with session context
+  (uses driver's `buildResumeCommand` with the captured session ID).
+- Expose `retry(prompt?)` for re-spawning from scratch (no session
+  context, fresh prompt).
+- Capture the agent's session ID from exit output (regex per driver)
+  to enable precise `--resume <id>` on later resume.
 - Track git progress: periodically run
   `git log --oneline <base>..HEAD` in the worktree to count commits.
 
@@ -323,7 +362,7 @@ Ink 7 (React for terminals). The dashboard has two modes:
 │  9 commits            5 commits         8 commits      │
 │  exit 0               > testing...      exit 0         │
 │                                                        │
-│  [d]iff  [p]ush  [r]etry  [c]leanup  [f]ocus  [q]uit  │
+│  [d]iff  [r]esume  [p]ush  [R]etry  [c]leanup  [q]uit  │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -339,7 +378,7 @@ Ink 7 (React for terminals). The dashboard has two modes:
 │  Summary: 3/3 succeeded, 23 total commits              │
 │  Worktrees: ../agent-worktrees/L{2,4,5}-*              │
 │                                                        │
-│  [d]iff  [p]ush  [c]leanup  [q]uit                    │
+│  [d]iff  [r]esume  [p]ush  [c]leanup  [q]uit           │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -380,19 +419,13 @@ interface Notification {
 
 ## Dependencies
 
-| Package                        | Purpose                       | Status in repo                         |
-| ------------------------------ | ----------------------------- | -------------------------------------- |
-| `node-pty` ^1.0.0              | Pty spawn                     | Already used by `coderWrapper`         |
-| `ink` ^7.0.0                   | TUI rendering                 | New                                    |
-| `react` ^18.0.0                | Peer dep for Ink              | New                                    |
-| `yaml` ^2.0.0                  | Lane config parsing           | New                                    |
-| `simple-git` ^3.0.0            | Worktree management           | New (could use raw `execFile` instead) |
-| `node-notifier` ^10.0.0        | Desktop notifications         | New; optional                          |
-| `interactive-app` workspace:\* | Reuse `StopWatch`, ANSI utils | Already in repo                        |
-
-`simple-git` is a convenience; we could use raw `child_process.execFile`
-for the 4 git commands we need. Decision: start with `execFile`, add
-`simple-git` only if the git surface grows.
+| Package                 | Purpose               | Status in repo                   |
+| ----------------------- | --------------------- | -------------------------------- |
+| `node-pty` ^1.0.0       | Pty spawn             | Already used by `coderWrapper`   |
+| `ink` ^7.0.0            | TUI rendering         | New                              |
+| `react` ^18.0.0         | Peer dep for Ink      | New                              |
+| `yaml` ^2.8.3           | Lane config parsing   | Already used by `agents/browser` |
+| `node-notifier` ^10.0.0 | Desktop notifications | New; optional                    |
 
 ## Phases
 
@@ -403,10 +436,12 @@ with a text-mode dashboard (no Ink). Output to stdout with ANSI
 status lines, refreshed on a timer. Focus mode via numbered input.
 
 Rationale for text-mode first: Ink adds React as a dependency and
-has a learning curve. A simple `setInterval` + ANSI cursor-control
-dashboard (using `interactiveApp`'s `ANSI` constants and
-`EnhancedSpinner`) is faster to ship and validates the core
-abstractions before investing in the TUI.
+has a learning curve. A simple `setInterval` + inline ANSI
+cursor-control dashboard is faster to ship and validates the core
+abstractions before investing in the TUI. ANSI escape codes and
+elapsed time tracking are inlined (~50 lines total) to avoid
+depending on workspace packages under `packages/`, since the
+orchestrator may be extracted to a separate repo.
 
 #### Chunk A: scaffold and config — PR 1 start
 
@@ -416,7 +451,7 @@ yet; the output is a validated config object and a buildable package.
 | Item | Description                                                                                 | Commit |
 | ---- | ------------------------------------------------------------------------------------------- | ------ |
 | A.1  | **Decision:** align `node-pty` version with `coderWrapper` to avoid duplicate native builds |        |
-| A.2  | **Decision:** resolve `simple-git` vs `execFile` (dependency table lists both; pick one)    |        |
+| A.2  | **Decision:** resolve `simple-git` vs `execFile` for git worktree commands                  |        |
 | A.3  | Package scaffold (`tools/agentOrchestrator/`)                                               | ✓      |
 | A.4  | Lane config loader (YAML)                                                                   | ✓      |
 
@@ -613,6 +648,11 @@ The sub-plan for each chunk must include:
   - Key implementation logic (algorithm, state transitions,
     control flow) described precisely enough that the agent
     does not need to make design choices during coding.
+    **Do not include full function implementations** unless
+    the code serves to explain a design concept. Describe
+    behavior, validation rules, and error cases in prose or
+    tables. The agent writes the implementation from the
+    contract.
   - Error handling strategy (what errors are possible, how
     each is handled).
   - Dependencies on other modules (imports, which functions
@@ -670,9 +710,12 @@ should include:
 ```
 tools/agentOrchestrator/
 ├── package.json
-├── tsconfig.json
+├── tsconfig.json              # composite root: references src + test
+├── jest.config.cjs            # extends ../../jest.config.js
 ├── src/
+│   ├── tsconfig.json          # src sub-project: outDir ../dist
 │   ├── main.ts                # CLI entrypoint
+│   ├── index.ts               # public API re-exports
 │   ├── orchestrator.ts        # top-level: load config, create sessions, run
 │   ├── config.ts              # YAML loader + validation
 │   ├── session.ts             # pty lifecycle + state machine
@@ -687,6 +730,8 @@ tools/agentOrchestrator/
 │       ├── textDashboard.ts   # Phase 1: ANSI status lines
 │       └── inkDashboard.tsx   # Phase 2: Ink TUI
 └── test/
+    ├── tsconfig.json          # test sub-project: outDir ../dist/test
+    ├── config.spec.ts
     ├── analyzer.spec.ts
     ├── session.spec.ts        # mock pty
     ├── worktree.spec.ts       # mock git
