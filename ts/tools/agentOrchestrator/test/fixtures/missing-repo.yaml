@@ -1,0 +1,7 @@
+base: main
+
+lanes:
+  - name: lane1
+    branch: orch/lane1
+    agent: copilot
+    prompt-file: ./prompts/L2-core.md

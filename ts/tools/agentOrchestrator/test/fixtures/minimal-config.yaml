@@ -1,0 +1,8 @@
+repo: /home/user/src/TypeAgent3/ts
+base: main
+
+lanes:
+  - name: single-lane
+    branch: orch/single
+    agent: copilot
+    prompt-file: ./prompts/L2-core.md

@@ -12,6 +12,7 @@ packages:
   - examples/*
   - examples/agentExamples/*
   - tools
+  - tools/*
 
 onlyBuiltDependencies:
   - "@azure/msal-node-extensions"

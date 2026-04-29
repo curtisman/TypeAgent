@@ -1,0 +1,12 @@
+repo: /home/user/src/TypeAgent3/ts
+base: main
+
+lanes:
+  - name: lane1
+    branch: orch/same-branch
+    agent: copilot
+    prompt-file: ./prompts/L2-core.md
+  - name: lane2
+    branch: orch/same-branch
+    agent: copilot
+    prompt-file: ./prompts/L3-tests.md

@@ -1,0 +1,30 @@
+repo: /home/user/src/TypeAgent3/ts
+base: grammartool
+
+notify:
+  channel: ntfy
+  topic: orchestrator-status
+  on: [blocked, failed, done]
+
+lanes:
+  - name: L2-core
+    branch: orch/L2-core
+    agent: copilot
+    prompt-file: ./prompts/L2-core.md
+    allow-tools:
+      - "shell(pnpm *)"
+      - read
+      - write
+
+  - name: L3-tests
+    branch: orch/L3-tests
+    agent: copilot
+    prompt-file: ./prompts/L3-tests.md
+    timeout: 30m
+
+  - name: L4-cli-scaffold
+    branch: orch/L4-cli-scaffold
+    agent: claude
+    prompt-file: ./prompts/L4-cli.md
+    env:
+      OPENAI_API_KEY: "$OPENAI_API_KEY_SECONDARY"
