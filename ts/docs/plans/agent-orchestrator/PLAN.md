@@ -550,6 +550,121 @@ replay + type-through), better layout, and keyboard shortcuts.
 | K.2  | **Decision:** tighten output analyzer patterns to reduce false positives (anchor regexes, require word boundaries) |        |
 | K.3  | **Decision:** support inline `prompt:` key in lane config (alternative to `prompt-file:` for short prompts)        |        |
 
+## Execution model
+
+This plan is executed by a **human operator** and one or more
+**coding agents** (Copilot, Claude Code, etc.). The table below
+defines who does what for each type of work.
+
+### Roles
+
+| Role         | Who                          | Tools                        |
+| ------------ | ---------------------------- | ---------------------------- |
+| **Operator** | Human developer              | Editor, terminal, git, PR UI |
+| **Agent**    | Coding agent (Copilot, etc.) | Editor, terminal (via agent) |
+
+### Per-item responsibilities
+
+| Work type               | Operator                                          | Agent                                                  |
+| ----------------------- | ------------------------------------------------- | ------------------------------------------------------ |
+| **Decision items**      | Makes the decision, records it in the plan        | Can research options and draft a recommendation        |
+| **Package scaffold**    | Reviews and merges                                | Generates package.json, tsconfig, directory structure  |
+| **Implementation code** | Reviews diff, runs manual smoke tests             | Writes src/ and test/ files, iterates until tests pass |
+| **Unit tests**          | Reviews coverage, spot-checks edge cases          | Writes tests, runs them, fixes failures                |
+| **E2e / integration**   | Runs real-life test points, reports issues        | Writes mock-agent fixtures and test harness            |
+| **PR creation**         | Creates PR, writes description, requests review   | Can draft PR description from commit log               |
+| **PR review feedback**  | Addresses reviewer comments or delegates to agent | Applies mechanical fixes (formatting, renames, etc.)   |
+
+### Chunk-by-chunk execution flow
+
+Each chunk follows this sequence:
+
+#### Phase 1: Sub-plan development (operator + agent collaborate)
+
+Before any code is written, the operator and agent develop a
+**sub-plan** for the chunk. The sub-plan is a detailed design
+document that eliminates ambiguity so the agent can implement
+without guessing.
+
+1. **Operator** resolves any Decision items in the chunk (or
+   delegates research to the agent and then decides). Each
+   decision is recorded in the sub-plan with rationale.
+2. **Operator + Agent** develop the sub-plan together:
+   - Agent reads the chunk section, referenced code patterns,
+     and related source files in the repo.
+   - Agent drafts the sub-plan; operator reviews and refines.
+   - Iterate until the operator is satisfied that the design
+     is complete enough for autonomous implementation.
+3. **Operator** approves the sub-plan. This is the gate before
+   any code is written.
+
+#### Sub-plan contents
+
+The sub-plan for each chunk must include:
+
+- **Scope**: which items from the chunk table are covered, and
+  what is explicitly out of scope.
+- **Resolved decisions**: each Decision item with the chosen
+  option and rationale. These are binding for implementation.
+- **Detailed design**: for each code item:
+  - File paths to create or modify.
+  - Exported types and interfaces (exact TypeScript signatures).
+  - Function signatures with parameter and return types.
+  - Key implementation logic (algorithm, state transitions,
+    control flow) described precisely enough that the agent
+    does not need to make design choices during coding.
+  - Error handling strategy (what errors are possible, how
+    each is handled).
+  - Dependencies on other modules (imports, which functions
+    are called).
+- **Test plan**: for each code item:
+  - Test file path.
+  - Test case names and what each verifies.
+  - Mock/stub strategy (what is mocked, what is real).
+  - Edge cases to cover.
+- **Pattern references**: specific files in the repo the agent
+  should follow as examples, with the exact aspects to mirror
+  (e.g. "follow `coderWrapper/src/coder.ts` for node-pty spawn
+  and cleanup pattern, specifically the `start()` and `stop()`
+  methods").
+- **Build verification**: the exact commands the agent must run
+  after each commit and the expected outcome.
+- **Commit plan**: one entry per commit with the item ID, commit
+  message template, and which files are included.
+
+#### Phase 2: Implementation (agent executes, operator reviews)
+
+4. **Agent** implements the code items per the sub-plan,
+   committing after each (one commit per checkmarked item).
+5. **Agent** runs `pnpm run build` and `pnpm run test:local`
+   after each commit to verify nothing is broken.
+6. **Operator** reviews the commits, runs any applicable
+   real-life test point, and requests fixes if needed.
+7. **Agent** addresses feedback with additional commits.
+8. At the PR boundary, **operator** creates the PR and
+   shepherds it through review.
+
+### What the agent needs in the implementation prompt
+
+Once the sub-plan is approved, the agent's implementation prompt
+should include:
+
+- The approved sub-plan (the full document, not a summary).
+- The chunk section from this plan (for context on where the
+  chunk fits in the overall dependency graph).
+- Explicit instruction to follow the sub-plan exactly: do not
+  add features, change signatures, or make design choices not
+  covered by the sub-plan. If a gap is found during
+  implementation, stop and ask the operator rather than
+  improvising.
+
+### What the operator watches for
+
+- Agent drifting from the plan (adding features not in scope).
+- Tests that pass but don't actually test the behavior described.
+- Decisions being made implicitly in code without being recorded.
+- Build or lint failures in other packages (blast radius).
+
 ## File layout
 
 ```
