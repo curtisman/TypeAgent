@@ -178,12 +178,13 @@ tools/agentOrchestrator/
 
 #### Modification to existing file
 
-**`pnpm-workspace.yaml`**: add `tools/*` glob after the existing
-`tools` entry.
+**`pnpm-workspace.yaml`**: add `- tools/*` line after the existing
+`- tools` entry. The file uses a flat list (no nested `packages:`
+key).
 
 ```yaml
 - tools
-- tools/* # new: sub-packages under tools/
+- tools/*
 ```
 
 This is safe because `tools/*` matches subdirectories only, not
@@ -225,6 +226,7 @@ entry).
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.7",
     "@types/node": "^18.19.3",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
@@ -281,6 +283,7 @@ Key choices:
     "types": ["node", "jest"]
   },
   "include": ["./**/*"],
+  "ts-node": { "esm": true },
   "references": [{ "path": "../src" }]
 }
 ```
@@ -288,7 +291,7 @@ Key choices:
 #### `jest.config.cjs`
 
 ```js
-module.exports = require("../../jest.config.js");
+module.exports = { ...require("../../jest.config.js") };
 ```
 
 Follows the composite pattern used by `actionGrammar`, `cache`,
