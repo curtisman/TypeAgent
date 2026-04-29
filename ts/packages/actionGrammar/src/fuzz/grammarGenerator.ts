@@ -709,6 +709,30 @@ export type GeneratorConfig = {
      * collapse.  Defaults to the first two words of `words`.
      */
     sharedPrefixWords?: readonly string[];
+    /**
+     * Soft cap on the number of tokens in a generated rule's
+     * matching-input expansion (`firstAltMatch`).  Bounds the
+     * combinatorial blowup that arises when ruleRefs and repeat
+     * groups compose: a chain of `maxParts` parts each ruleRef'ing
+     * a previous rule with `repCount=3` multiplies token counts
+     * by ~12 per nesting level, producing thousands-of-token inputs
+     * at modest grammar sizes.
+     *
+     * The cap clamps only the **matching input replication count**
+     * (`repCount`) when building the bottom-up `firstAltMatch`; the
+     * grammar's AST shape (which quantifiers are emitted, which
+     * parts appear) is unchanged.  The matcher accepts any valid
+     * count for `*` (>=0), `?` (0..1), `+` (>=1), so the generated
+     * input still matches by construction.  Bare-quantifier and `+`
+     * parts can still exceed the cap by a single inner expansion -
+     * the cap is a soft ceiling, not a hard bound.
+     *
+     * Default: 64 tokens (~4-8x larger than typical un-capped
+     * outputs for the default config; small enough to keep the
+     * matcher's per-input cost bounded).  Set to `Infinity` to
+     * disable the cap.
+     */
+    maxMatchTokens?: number;
 };
 
 export const DEFAULT_GENERATOR_CONFIG: GeneratorConfig = {
@@ -1228,6 +1252,15 @@ export function buildRandomGrammar(
     const ruleCount = intInRange(rng, 1, maxRules);
     const ruleName = (i: number) => `R${i}`;
 
+    // Soft cap on tokens per rule's `firstAltMatch`.  Clamps the
+    // matching-input replication count for repeat / optional
+    // quantifiers when adding more copies would push a rule's
+    // expansion past the cap.  Does NOT change the emitted grammar
+    // text (quantifier kind, part choice) - only the multiplicity
+    // used to build the matching input string.  See
+    // `GeneratorConfig.maxMatchTokens` for the rationale.
+    const maxMatchTokens = config.maxMatchTokens ?? 64;
+
     const varCounter = { n: 0 };
     let usesValueExpressions = false;
 
@@ -1505,8 +1538,38 @@ export function buildRandomGrammar(
                 partTexts.push(partText);
                 // Replicate the inner expansion `repCount` times to
                 // exercise multi-rep semantics for `+` and `*` (and
-                // zero-rep elision for `?` and `*`).
-                for (let r = 0; r < repCount; r++)
+                // zero-rep elision for `?` and `*`).  For the first
+                // alternate (the one that becomes the matching
+                // input) we additionally clamp `repCount` against
+                // the soft `maxMatchTokens` budget so deeply nested
+                // ruleRefs + repeats can't compound into thousands
+                // of tokens.  The grammar text is already finalized
+                // above (this clamp affects only matching-input
+                // multiplicity), and we respect each quantifier's
+                // minimum: bare and `+` keep at least 1 copy.
+                let matchRepCount = repCount;
+                if (a === 0 && Number.isFinite(maxMatchTokens)) {
+                    const remaining = maxMatchTokens - partMatch.length;
+                    const innerLen = innerMatch.length;
+                    if (innerLen > 0 && matchRepCount * innerLen > remaining) {
+                        // `+` (repeat && !optional) requires >=1 copy;
+                        // bare (no quantifier) requires exactly 1;
+                        // `?` and `*` accept 0.  Pick the floor each
+                        // case can be clamped to.
+                        const minRep =
+                            !optional && !repeat
+                                ? 1
+                                : repeat && !optional
+                                  ? 1
+                                  : 0;
+                        const fitting = Math.floor(remaining / innerLen);
+                        matchRepCount = Math.max(
+                            minRep,
+                            Math.min(matchRepCount, fitting),
+                        );
+                    }
+                }
+                for (let r = 0; r < matchRepCount; r++)
                     partMatch.push(...innerMatch);
             }
 
