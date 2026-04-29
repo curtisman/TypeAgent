@@ -402,48 +402,137 @@ Ship a working `agent-orchestrator` that can run N lanes in parallel
 with a text-mode dashboard (no Ink). Output to stdout with ANSI
 status lines, refreshed on a timer. Focus mode via numbered input.
 
-| Item  | Description                                            |
-| ----- | ------------------------------------------------------ |
-| P1.1  | Package scaffold (`tools/agentOrchestrator/`)          |
-| P1.2  | Lane config loader (YAML)                              |
-| P1.3  | Worktree manager                                       |
-| P1.4  | Agent driver interface + `copilot` driver              |
-| P1.5  | Session manager (node-pty + state machine)             |
-| P1.6  | Output analyzer (regex v1)                             |
-| P1.7  | Text-mode dashboard (ANSI status lines, no Ink)        |
-| P1.8  | Post-completion actions (diff, push, cleanup)          |
-| P1.9  | Notifier (ntfy channel only)                           |
-| P1.10 | End-to-end test: 3 lanes with mock agent (echo script) |
-
 Rationale for text-mode first: Ink adds React as a dependency and
 has a learning curve. A simple `setInterval` + ANSI cursor-control
 dashboard (using `interactiveApp`'s `ANSI` constants and
 `EnhancedSpinner`) is faster to ship and validates the core
 abstractions before investing in the TUI.
 
+#### Chunk A: scaffold and config
+
+Set up the package and load lane definitions. No runtime behavior
+yet; the output is a validated config object and a buildable package.
+
+| Item | Description                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------- |
+| A.1  | **Decision:** align `node-pty` version with `coderWrapper` to avoid duplicate native builds |
+| A.2  | **Decision:** resolve `simple-git` vs `execFile` (dependency table lists both; pick one)    |
+| A.3  | Package scaffold (`tools/agentOrchestrator/`)                                               |
+| A.4  | Lane config loader (YAML)                                                                   |
+
+#### Chunk B: worktree manager
+
+Create, list, and remove git worktrees. Depends on Chunk A for the
+config (branch names, repo root).
+
+| Item | Description                                                                                                                             |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| B.1  | **Decision:** define worktree setup failure modes (branch exists, dirty tree, agent not in PATH) and fail-fast vs `--continue-on-error` |
+| B.2  | **Decision:** serialize worktree mutations to avoid git lock conflicts during concurrent cleanup + retry                                |
+| B.3  | Worktree manager                                                                                                                        |
+
+#### Chunk C: session manager and agent driver
+
+Spawn agent processes in ptys, manage the lane state machine, handle
+timeouts and shutdown. Depends on Chunk B for worktree paths.
+
+| Item | Description                                                                                        |
+| ---- | -------------------------------------------------------------------------------------------------- |
+| C.1  | **Decision:** add KILLED and TIMED_OUT terminal states to the state machine (distinct from FAILED) |
+| C.2  | **Decision:** define timeout behavior (kill? notify? which state?)                                 |
+| C.3  | **Decision:** define pause/resume semantics (SIGSTOP/SIGCONT?) or remove from Phase 1 UI mockup    |
+| C.4  | **Decision:** define SIGINT/SIGTERM teardown sequence for graceful shutdown                        |
+| C.5  | Agent driver interface + `copilot` driver                                                          |
+| C.6  | Session manager (node-pty + state machine)                                                         |
+
+#### Chunk D: output analyzer
+
+Classify pty output lines into signals (progress, blocked, error,
+milestone). Depends on Chunk C for the session output stream.
+
+| Item | Description                                                                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------------- |
+| D.1  | **Decision:** refine BLOCKED detection heuristic (silence alone vs silence + approval pattern in recent output) |
+| D.2  | Output analyzer (regex v1)                                                                                      |
+
+#### Chunk E: text-mode dashboard
+
+Render lane status to the terminal. Depends on Chunks C and D for
+session state and analyzer signals.
+
+| Item | Description                                                                                                             |
+| ---- | ----------------------------------------------------------------------------------------------------------------------- |
+| E.1  | **Decision:** define lane selection UX for text-mode focus (number key, arrow keys, etc.)                               |
+| E.2  | **Decision:** define focus-mode escape sequence for text-mode (how to distinguish pty input from orchestrator commands) |
+| E.3  | Text-mode dashboard (ANSI status lines, no Ink)                                                                         |
+
+#### Chunk F: post-completion, notifications, and e2e test
+
+Wire up the remaining runtime features and validate everything
+end-to-end. Depends on Chunks B-E.
+
+| Item | Description                                            |
+| ---- | ------------------------------------------------------ |
+| F.1  | Post-completion actions (diff, push, cleanup)          |
+| F.2  | Notifier (ntfy channel only)                           |
+| F.3  | End-to-end test: 3 lanes with mock agent (echo script) |
+
+#### Phase 1 chunk dependency graph
+
+```
+A (scaffold/config)
+└─► B (worktree)
+    └─► C (session/driver)
+        ├─► D (analyzer)
+        │   └─► E (dashboard) ◄─── C
+        └─► F (post-completion, notifier, e2e) ◄─── D, E
+```
+
 ### Phase 2: Ink TUI
 
 Replace the text-mode dashboard with Ink. Adds focus mode (full pty
 replay + type-through), better layout, and keyboard shortcuts.
 
-| Item | Description                                    |
-| ---- | ---------------------------------------------- |
-| P2.1 | Add `ink` + `react` dependencies               |
-| P2.2 | `<Dashboard>` + `<LaneCard>` components        |
-| P2.3 | `<FocusView>` with pty replay and type-through |
-| P2.4 | `<StatusBar>` with key bindings                |
-| P2.5 | Desktop notification channel                   |
+#### Chunk G: Ink dashboard
+
+| Item | Description                                                                                  |
+| ---- | -------------------------------------------------------------------------------------------- |
+| G.1  | Add `ink` + `react` dependencies                                                             |
+| G.2  | `<Dashboard>` + `<LaneCard>` components                                                      |
+| G.3  | `<FocusView>` with pty replay and type-through                                               |
+| G.4  | `<StatusBar>` with key bindings                                                              |
+| G.5  | **Decision:** require push confirmation (show branch + remote, y/n) or allow single-key push |
+
+#### Chunk H: desktop notifications
+
+| Item | Description                  |
+| ---- | ---------------------------- |
+| H.1  | Desktop notification channel |
 
 ### Phase 3: polish
 
+#### Chunk I: additional drivers and notification channels
+
+| Item | Description                  |
+| ---- | ---------------------------- |
+| I.1  | `claude` agent driver        |
+| I.2  | Webhook notification channel |
+
+#### Chunk J: advanced lane management
+
 | Item | Description                                                |
 | ---- | ---------------------------------------------------------- |
-| P3.1 | `claude` agent driver                                      |
-| P3.2 | Webhook notification channel                               |
-| P3.3 | Lane dependency ordering (start L4 only after L2 finishes) |
-| P3.4 | Auto-cleanup of worktrees on exit                          |
-| P3.5 | Config validation with clear error messages                |
-| P3.6 | Retry failed lane with modified prompt                     |
+| J.1  | Lane dependency ordering (start L4 only after L2 finishes) |
+| J.2  | Auto-cleanup of worktrees on exit                          |
+| J.3  | Retry failed lane with modified prompt                     |
+
+#### Chunk K: config and analyzer hardening
+
+| Item | Description                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------ |
+| K.1  | Config validation with clear error messages                                                                        |
+| K.2  | **Decision:** tighten output analyzer patterns to reduce false positives (anchor regexes, require word boundaries) |
+| K.3  | **Decision:** support inline `prompt:` key in lane config (alternative to `prompt-file:` for short prompts)        |
 
 ## File layout
 
