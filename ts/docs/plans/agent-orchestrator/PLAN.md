@@ -323,12 +323,27 @@ LLM for richer classification, but that is out of scope for v1.
 Thin wrapper around `git worktree` commands. Manages the lifecycle of
 per-lane worktrees.
 
-- `create(baseBranch, newBranch, path)`: `git worktree add <path> -b <newBranch> <baseBranch>`.
-- `remove(path)`: `git worktree remove <path>`.
-- `list()`: `git worktree list --porcelain`.
-- `commitCount(path, base)`: `git log --oneline <base>..HEAD` in the worktree.
-- Worktrees are created under a sibling directory:
-  `<repoRoot>/../agent-worktrees/<lane-name>/`.
+- `worktreePath(repoRoot, laneName, baseDir?)`: compute the worktree
+  directory path (pure function, no I/O).
+- `createWorktree(repoRoot, baseBranch, newBranch, wtPath)`:
+  `git worktree add <wtPath> -b <newBranch> <baseBranch>`.
+- `removeWorktree(repoRoot, wtPath, deleteBranch?)`:
+  `git worktree remove <wtPath> --force`, optionally
+  `git branch -D <branch>`.
+- `listWorktrees(repoRoot)`: `git worktree list --porcelain`.
+- `commitCount(wtPath, baseBranch)`: `git log --oneline <base>..HEAD`
+  in the worktree.
+- `setupAll(config)`: sequential `createWorktree` per lane with
+  rollback on failure.
+- `teardownAll(config)`: sequential `removeWorktree` per lane,
+  best-effort (continues past errors).
+
+Worktrees are created under a central dotdir:
+`~/.agent-orchestrator/<absolute-repo-path>/<lane-name>/`.
+The full absolute repo path (leading `/` stripped) is used as the
+directory structure so worktrees trivially map back to their source
+repo. The base directory (`~/.agent-orchestrator`) is configurable
+via `--worktree-dir`.
 
 Uses `child_process.execFile` (not `node-pty` - these are non-interactive
 git commands).
@@ -376,7 +391,7 @@ Ink 7 (React for terminals). The dashboard has two modes:
 │  9 commits            6 commits         8 commits      │
 │                                                        │
 │  Summary: 3/3 succeeded, 23 total commits              │
-│  Worktrees: ../agent-worktrees/L{2,4,5}-*              │
+│  Worktrees: ~/.agent-orchestrator/.../L{2,4,5}-*       │
 │                                                        │
 │  [d]iff  [r]esume  [p]ush  [c]leanup  [q]uit           │
 └────────────────────────────────────────────────────────┘
