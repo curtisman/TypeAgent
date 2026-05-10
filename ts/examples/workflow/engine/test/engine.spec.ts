@@ -1281,8 +1281,11 @@ describe("WorkflowEngine (IR v1)", () => {
                             },
                         },
                         inputs: {
-                            command: "echo",
-                            args: ["hello", "world"] as Template,
+                            command: "node",
+                            args: [
+                                "-e",
+                                "process.stdout.write('hello world')",
+                            ] as Template,
                         },
                         bind: "result",
                     },
@@ -1324,6 +1327,10 @@ describe("WorkflowEngine (IR v1)", () => {
                             required: ["command"],
                             properties: {
                                 command: { type: "string" },
+                                args: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                },
                             },
                         },
                         outputSchema: {
@@ -1336,7 +1343,8 @@ describe("WorkflowEngine (IR v1)", () => {
                             },
                         },
                         inputs: {
-                            command: "false",
+                            command: "node",
+                            args: ["-e", "process.exit(1)"] as Template,
                         },
                         bind: "result",
                     },
@@ -4663,8 +4671,11 @@ describe("WorkflowEngine (IR v1)", () => {
                             },
                         },
                         inputs: {
-                            command: "bash" as Template,
-                            args: ["-c", "echo errormsg >&2"] as Template,
+                            command: "node" as Template,
+                            args: [
+                                "-e",
+                                "process.stderr.write('errormsg')",
+                            ] as Template,
                         },
                         bind: "result",
                     },
