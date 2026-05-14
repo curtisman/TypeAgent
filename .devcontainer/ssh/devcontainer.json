@@ -1,0 +1,109 @@
+{
+  // SSH variant devcontainer config — adds OpenSSH server so the VS Code Agents window
+  // can connect via Remote → SSH (loopback, port 2222, key-only auth).
+  //
+  // ⚠️  LOCAL DEVELOPMENT ONLY — do not use with GitHub Codespaces.
+  //     The bind mount for the SSH public key requires a local Windows host
+  //     (uses %USERPROFILE%). In Codespaces, use the default devcontainer.json instead.
+  //
+  // Prerequisites (host):
+  //   1. Generate a key pair: ssh-keygen -t ed25519 -f ~/.ssh/typeagent_devcontainer
+  //   2. Add ~/.ssh/config entry (see .devcontainer/ssh/README.md)
+  //
+  // Usage:
+  //   Command Palette → "Dev Containers: Reopen in Container"
+  //   → pick "ssh/devcontainer.json" (shows as "TypeAgent Development (SSH - Local)")
+  //
+  // Agents window:
+  //   New Session → Remote → SSH → typeagent-devcontainer → /workspaces/TypeAgent
+
+  "name": "TypeAgent Development (SSH - Local)",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  // Fix stale yarn GPG key in base image before features install
+  "initializeCommand": "docker run --rm mcr.microsoft.com/devcontainers/universal:2 echo 'Pulling base image...' || true",
+
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "8.0"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    // SSH server for VS Code Agents window (Remote → SSH).
+    // Hardened to key-only auth by post-create-local.sh.
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
+
+  // Fix yarn GPG key issue in base image
+  "onCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list || true",
+
+  "forwardPorts": [8999, 8081, 8082, 3000, 3443, 2222],
+  "portsAttributes": {
+    "8999": { "label": "Agent Server (WebSocket)", "onAutoForward": "notify" },
+    "8081": { "label": "Browser Agent (WebSocket)", "onAutoForward": "notify" },
+    "8082": { "label": "Code Agent (WebSocket)", "onAutoForward": "notify" },
+    "3000": { "label": "API Server (HTTP)", "onAutoForward": "notify" },
+    "3443": { "label": "API Server (HTTPS)", "onAutoForward": "notify" },
+    "2222": { "label": "SSH (Agents window)", "onAutoForward": "silent" }
+  },
+
+  "mounts": [
+    // Global pnpm store - shared across containers for fast installs
+    "source=pnpm-global-store,target=/home/codespace/.local/share/pnpm/store,type=volume",
+    // Per-container node_modules (symlinks to global store)
+    "source=typeagent-node_modules-${devcontainerId},target=${containerWorkspaceFolder}/ts/node_modules,type=volume",
+    // Claude Code config persistence
+    "source=claude-code-config-${devcontainerId},target=/home/codespace/.claude,type=volume",
+    // Read-only mount of the host SSH public key; installed by post-create-ssh.sh.
+    // Uses ${localEnv:USERPROFILE} which Docker Desktop translates from Windows path.
+    // If this fails, verify the file exists: Test-Path $env:USERPROFILE\.ssh\typeagent_devcontainer.pub
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh/typeagent_devcontainer.pub,target=/tmp/host_authorized_key.pub,type=bind,readonly"
+  ],
+
+  "containerEnv": {
+    "PNPM_HOME": "/home/codespace/.local/share/pnpm"
+  },
+
+  "postCreateCommand": "cat .devcontainer/scripts/post-create.sh | tr -d '\\r' | bash && cat .devcontainer/ssh/post-create-ssh.sh | tr -d '\\r' | bash",
+  "postStartCommand": "cat .devcontainer/scripts/post-start.sh | tr -d '\\r' | bash",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-azurefunctions",
+        "github.copilot",
+        "humao.rest-client"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+
+  "remoteUser": "codespace",
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}
