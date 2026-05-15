@@ -1,0 +1,107 @@
+{
+  "name": "TypeAgent Development (SSH)",
+
+  // Variant of the standard devcontainer that runs an OpenSSH server inside
+  // the container so external tools can connect via SSH. Useful for:
+  //   - VS Code Remote-SSH (open another window connected directly to the
+  //     container, independent of the Dev Containers extension)
+  //   - AI agent tools / "agent windows" that operate over SSH (Copilot CLI,
+  //     Claude Code remote, Cursor, JetBrains Gateway, tmux/mosh sessions, ...)
+  //   - Plain `ssh` / `scp` / `rsync` from the host
+  //
+  // The container still works with the Dev Containers extension exactly like
+  // the default config; SSH is additive.
+
+  "image": "mcr.microsoft.com/devcontainers/universal:6",
+
+  "initializeCommand": "cat .devcontainer/scripts/init-ssh-keys.sh | tr -d '\\r' | bash || true",
+
+  "features": {
+    // OpenSSH server. Listens on container port 2222 by default and reuses
+    // the remoteUser's account. Public keys placed in
+    // /home/codespace/.ssh/authorized_keys (see setup-ssh.sh) are honored.
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "8.0"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "onCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list || true",
+
+  "forwardPorts": [2222, 8999, 8081, 8082, 3000, 3443],
+  "portsAttributes": {
+    "2222": { "label": "SSH Server", "onAutoForward": "notify" },
+    "8999": { "label": "Agent Server (WebSocket)", "onAutoForward": "notify" },
+    "8081": { "label": "Browser Agent (WebSocket)", "onAutoForward": "notify" },
+    "8082": { "label": "Code Agent (WebSocket)", "onAutoForward": "notify" },
+    "3000": { "label": "API Server (HTTP)", "onAutoForward": "notify" },
+    "3443": { "label": "API Server (HTTPS)", "onAutoForward": "notify" }
+  },
+
+  "mounts": [
+    "source=pnpm-global-store,target=/home/codespace/.local/share/pnpm/store,type=volume",
+    "source=typeagent-node_modules-${devcontainerId},target=${containerWorkspaceFolder}/ts/node_modules,type=volume",
+    "source=claude-code-config-${devcontainerId},target=/home/codespace/.claude,type=volume",
+    // Bind-mount a SCRATCH directory that contains ONLY the host user's
+    // SSH *.pub files (populated by initializeCommand →
+    // .devcontainer/scripts/init-ssh-keys.sh). The host ~/.ssh itself is
+    // never exposed to the container, so private keys, known_hosts, and
+    // ssh config stay on the host.
+    //
+    // Path resolution: ${localEnv:HOME} on macOS/Linux, ${localEnv:USERPROFILE}
+    // on Windows; the empty one collapses to "" so concatenation works.
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.typeagent-devcontainer-ssh,target=/tmp/host-ssh,type=bind,readonly,consistency=cached"
+  ],
+
+  "containerEnv": {
+    "PNPM_HOME": "/home/codespace/.local/share/pnpm"
+  },
+
+  "postCreateCommand": "cat .devcontainer/scripts/post-create.sh | tr -d '\\r' | bash && cat .devcontainer/scripts/setup-ssh.sh | tr -d '\\r' | bash",
+  "postStartCommand": "cat .devcontainer/scripts/post-start.sh | tr -d '\\r' | bash && cat .devcontainer/scripts/setup-ssh.sh | tr -d '\\r' | bash -s -- --start-only",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-azurefunctions",
+        "github.copilot",
+        "humao.rest-client"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    },
+    "codespaces": {
+      "openFiles": ["ts/README.md"]
+    }
+  },
+
+  "remoteUser": "codespace",
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  }
+}

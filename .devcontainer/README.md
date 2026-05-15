@@ -52,6 +52,110 @@ pnpm run server
 cd ts && pnpm run shell
 ```
 
+### SSH (`ssh/devcontainer.json`)
+
+See [`ssh/README.md`](./ssh/README.md) for the full guide. In short:
+
+Same toolchain as the standard config plus an OpenSSH server inside the
+container. Use this variant when you want to attach **additional** windows or
+tools to the running container over SSH — for example:
+
+- A second VS Code window connected via **Remote-SSH** (independent of the
+  Dev Containers extension).
+- Standalone AI agent tools / "agent windows" that operate over SSH
+  (Copilot CLI, Claude Code, Cursor, JetBrains Gateway, `tmux` / `mosh`
+  sessions, etc.).
+- Plain `ssh`, `scp`, or `rsync` from the host.
+
+To use this variant, open the folder with Command Palette →
+`Dev Containers: Reopen in Container`, then pick **TypeAgent Development (SSH)**
+when prompted. (VS Code automatically lists every `devcontainer.json` under
+`.devcontainer/*/`.)
+
+**Prerequisite:** before launching, the host runs
+[`scripts/init-ssh-keys.sh`](./scripts/init-ssh-keys.sh) automatically (via
+`initializeCommand`). It copies **only** `*.pub` files from your `~/.ssh`
+into `~/.typeagent-devcontainer-ssh/` and the container bind-mounts that
+scratch directory read-only. Your private keys, `known_hosts`, and `ssh
+config` are **never** exposed to the container.
+
+On Windows, this requires `bash` on the host PATH (Git Bash or WSL —
+both are typical for devcontainer users). If you don't have either,
+create the staging directory manually:
+
+```powershell
+mkdir $env:USERPROFILE\.typeagent-devcontainer-ssh
+copy $env:USERPROFILE\.ssh\*.pub $env:USERPROFILE\.typeagent-devcontainer-ssh\
+```
+
+**What it does on first start**
+
+1. Installs and starts `sshd` via the
+   [`sshd` devcontainer feature](https://github.com/devcontainers/features/tree/main/src/sshd).
+2. Forwards container port `2222` to your host.
+3. Runs `.devcontainer/scripts/setup-ssh.sh`, which:
+   - Imports every `*.pub` file from your host's `~/.ssh` (mounted
+     read-only at `/tmp/host-ssh`) into
+     `/home/codespace/.ssh/authorized_keys`.
+   - Writes a hardened drop-in at
+     `/etc/ssh/sshd_config.d/00-typeagent-hardening.conf` and validates it
+     with `sshd -t` before reloading.
+
+**Security posture**
+
+The drop-in pins sshd to a strict, key-only configuration:
+
+| Setting                                           | Value                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| `ListenAddress`                                   | `127.0.0.1` (loopback inside container)                        |
+| `Port`                                            | `2222`                                                         |
+| `PasswordAuthentication`                          | `no`                                                           |
+| `KbdInteractiveAuthentication`                    | `no`                                                           |
+| `PermitRootLogin`                                 | `no`                                                           |
+| `PermitEmptyPasswords`                            | `no`                                                           |
+| `AuthenticationMethods`                           | `publickey`                                                    |
+| `AllowUsers`                                      | `codespace` only                                               |
+| `MaxAuthTries` / `LoginGraceTime`                 | `3` / `30s`                                                    |
+| `X11Forwarding` / `GatewayPorts` / `PermitTunnel` | `no`                                                           |
+| `AllowAgentForwarding` / `AllowTcpForwarding`     | `yes` (needed by Remote-SSH)                                   |
+| Kex / Ciphers / MACs / HostKeyAlgorithms          | modern only (Ed25519, ChaCha20-Poly1305, AES-GCM, ETM-MACs, …) |
+| `LogLevel`                                        | `VERBOSE`                                                      |
+
+> The default password baked into the upstream `sshd` feature is **never**
+> usable — `PasswordAuthentication no` and `AuthenticationMethods publickey`
+> both forbid it. If you remove the bind mount or have no `*.pub` keys on the
+> host, sshd will start but every connection will be rejected; copy a public
+> key into `/home/codespace/.ssh/authorized_keys` manually to recover.
+
+Because sshd binds to `127.0.0.1` inside the container, the only way to
+reach it is via Docker / VS Code port forwarding, which already terminates
+on host loopback. The port is never exposed on the container's external
+network interface or to other containers on the same Docker network.
+
+**Connect from your host**
+
+```bash
+ssh -p 2222 codespace@localhost
+```
+
+**VS Code Remote-SSH** — add to `~/.ssh/config` (Windows: `%USERPROFILE%\.ssh\config`):
+
+```
+Host typeagent-devcontainer
+    HostName localhost
+    Port 2222
+    User codespace
+```
+
+Then run `Remote-SSH: Connect to Host…` → `typeagent-devcontainer`. The
+working tree is at `/workspaces/TypeAgent` (or the worktree path used by
+your container).
+
+**Codespaces note:** when running in GitHub Codespaces, use
+`gh codespace ssh -c <name>` instead — Codespaces already exposes SSH
+through the `gh` CLI, so this variant is most useful for local Docker
+Desktop scenarios.
+
 ## Working with the Container
 
 ### Common Commands
@@ -107,6 +211,7 @@ Each worktree shares the git history but has independent:
 | 8081 | Browser Agent (WebSocket)       |
 | 8082 | Code Agent (WebSocket)          |
 | 6080 | noVNC Desktop (VNC config only) |
+| 2222 | SSH Server (SSH config only)    |
 
 ## Troubleshooting
 
