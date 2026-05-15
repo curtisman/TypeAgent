@@ -1,0 +1,109 @@
+# syntax=docker/dockerfile:1.7
+#
+# Stage 1 baseline agent image for TypeAgent.
+#
+# Goals:
+#   * Build the entire TS workspace (`pnpm install` + `pnpm -r build`).
+#   * Run `test:local` for non-shell, non-browser packages.
+#   * Stay small and easy to lock down (no Chrome, no Electron runtime,
+#     no GTK/X stack, no gnome-keyring).
+#
+# A separate Dockerfile (Stage 2, future) will extend this to also run the
+# Electron shell and Puppeteer browser tests.
+
+ARG NODE_IMAGE=node:22-slim
+
+############################
+# Builder
+############################
+FROM ${NODE_IMAGE} AS builder
+
+# Skip heavy postinstall downloads. We still build the TS sources for
+# `agent-shell` / `browser-typeagent`; we just don't pull their runtime
+# binaries (Electron ~100MB, Chrome ~170MB, Playwright browsers).
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 \
+    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    CI=1
+
+# Minimal native build deps for node-gyp modules
+# (better-sqlite3, usocket, keytar, etc.). No Chrome/GTK/X.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        python3 \
+        make \
+        g++ \
+        pkg-config \
+        libsecret-1-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g corepack@latest \
+ && corepack enable pnpm
+
+WORKDIR /app
+
+# Copy the whole `ts/` workspace. Build context is the `ts/` directory.
+COPY . /app
+
+# Pre-stage the exact pnpm version pinned in package.json's `packageManager`
+# field so the runtime image never needs network access for corepack.
+RUN corepack prepare --activate
+
+# Install + build. Native modules compile here; Electron/Chrome are skipped.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+
+RUN pnpm -r build
+
+############################
+# Runtime
+############################
+FROM ${NODE_IMAGE} AS runtime
+
+# Keep the same SKIP_* env in runtime so any post-copy invocation stays light.
+ENV PUPPETEER_SKIP_DOWNLOAD=1 \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 \
+    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    CI=1 \
+    NODE_ENV=production
+
+# pnpm is required to drive the workspace test commands. Install it directly
+# via npm at the version pinned in the workspace `packageManager` field, so
+# the runtime image needs no network access (no corepack download dance).
+# `COREPACK_ENABLE_PROJECT_SPEC=0` makes any stray corepack invocation skip
+# the `packageManager` enforcement that would otherwise trigger a download.
+ARG PNPM_VERSION=10.33.3
+ENV COREPACK_ENABLE_PROJECT_SPEC=0 \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN npm install -g pnpm@${PNPM_VERSION} \
+ && npm install -g @github/copilot \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Non-root user for runtime hardening.
+RUN groupadd --system --gid 1001 agent \
+ && useradd  --system --uid 1001 --gid agent --home-dir /home/agent --create-home --shell /usr/sbin/nologin agent
+
+WORKDIR /app
+COPY --from=builder --chown=agent:agent /app /app
+
+USER agent
+
+# Default: run the non-shell / non-browser local tests.
+# Override at `docker run` time for ad-hoc commands.
+CMD ["pnpm", "-r", "--no-bail", "--no-sort", "--stream", "--workspace-concurrency=1", \
+     "--filter", "!agent-shell", \
+     "--filter", "!browser-typeagent", \
+     "--filter", "!desktop-automation", \
+     "--filter", "!vscode-shell", \
+     "run", "test:local"]

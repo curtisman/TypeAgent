@@ -1,0 +1,38 @@
+{
+    "name": "TypeAgent (hardened agent container)",
+    "build": {
+        "dockerfile": "../../ts/docker/Dockerfile.agent",
+        "context": "../../ts"
+    },
+    "remoteUser": "agent",
+    "workspaceFolder": "/workspaces/TypeAgent",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/TypeAgent,type=bind,consistency=cached",
+    "runArgs": [
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "--pids-limit=1024"
+    ],
+    "mounts": [
+        "source=typeagent-hardened-copilot-home,target=/home/agent/.copilot,type=volume",
+        "source=typeagent-hardened-pnpm-store,target=/app/.pnpm-store,type=volume"
+    ],
+    "containerEnv": {
+        "PUPPETEER_SKIP_DOWNLOAD": "1",
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD": "1"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash"
+            }
+        }
+    },
+    "postCreateCommand": "pnpm --version && copilot --version || true"
+}
