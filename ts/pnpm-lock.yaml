@@ -957,6 +957,9 @@ importers:
 
   examples/workflow/engine:
     dependencies:
+      '@github/copilot-sdk':
+        specifier: ^0.3.0
+        version: 0.3.0
       aiclient:
         specifier: workspace:*
         version: link:../../../packages/aiclient
@@ -6858,8 +6861,20 @@ packages:
     os: [darwin]
     hasBin: true
 
+  '@github/copilot-darwin-arm64@1.0.44':
+    resolution: {integrity: sha512-9NqA5sT2spmNsehxhs51GhXRZIZga5nq+WcMl4LG2QrUPJRDwvHf1bDKqETJUBbYvBY8jONGuTKMRofkMI68YQ==}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
   '@github/copilot-darwin-x64@1.0.17':
     resolution: {integrity: sha512-yqRS0/8kYTGl4VvfJ/QOtHTeYF+DnAWNUReZgt2U0AEP3zgj4z4hxSH7D2PsO/488L4KsBmmcnJr13HmBGiT/w==}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@github/copilot-darwin-x64@1.0.44':
+    resolution: {integrity: sha512-QPD8KtXx07SIKILGBl4JDhPyL2Qo0FMmaTYVxR6nkyHkHnFPsUZD6VWGR+T/KMLkcUXFM85Xc1ba9Y27s4nRrQ==}
     cpu: [x64]
     os: [darwin]
     hasBin: true
@@ -6870,8 +6885,20 @@ packages:
     os: [linux]
     hasBin: true
 
+  '@github/copilot-linux-arm64@1.0.44':
+    resolution: {integrity: sha512-Z8ScIUP433xS18f68NP9jM9zW320Xzpi2wf7Nig/VyfrwupBy25UTezydQMT0KQHLWTEleHOPcYnASY3HgJXnQ==}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
   '@github/copilot-linux-x64@1.0.17':
     resolution: {integrity: sha512-4Yum3uaAuTM/SiNtzchsO/G/144Bi/Z4FEcearW6WsGDvS6cRwSJeudOM0y4aoy4BHcv8+yw7YuXH5BHC3SAiA==}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@github/copilot-linux-x64@1.0.44':
+    resolution: {integrity: sha512-KUl6lvJt0HNKaXSx0T0bIWJ3rvrGwgZYMlkDfqMbuMnZatEQJbjPwxmL/IDfp/c0DyKd7K+ajl17wHYcN/hJIQ==}
     cpu: [x64]
     os: [linux]
     hasBin: true
@@ -6880,8 +6907,18 @@ packages:
     resolution: {integrity: sha512-fCEpD9W9xqcaCAJmatyNQ1PkET9P9liK2P4Vk0raDFoMXcvpIdqewa5JQeKtWCBUsN/HCz7ExkkFP8peQuo+DA==}
     engines: {node: '>=20.0.0'}
 
+  '@github/copilot-sdk@0.3.0':
+    resolution: {integrity: sha512-SUo35k56pzzgYgwmDPHcu7kZxPrzXbH66IWXaEf6pmb94DlA709F82HrrDeja087TL4djJ9OuvRFWWOKCosAsg==}
+    engines: {node: '>=20.0.0'}
+
   '@github/copilot-win32-arm64@1.0.17':
     resolution: {integrity: sha512-I1ferbfQ0aS149WyEUw6XS1sFixwTUUm13BPBQ3yMzD8G2SaoxTsdYdlhZpkVfkfh/rUYyvMKKi9VNxoVYOlDA==}
+    cpu: [arm64]
+    os: [win32]
+    hasBin: true
+
+  '@github/copilot-win32-arm64@1.0.44':
+    resolution: {integrity: sha512-JVJxZJwAc95ZfapgOXjNFwSqrWlvC3heo128L+CDkdZ6lwpD1dTGMHT/6rMMEeo3xjZmMm8tiynfwsHLDgTtvQ==}
     cpu: [arm64]
     os: [win32]
     hasBin: true
@@ -6892,8 +6929,18 @@ packages:
     os: [win32]
     hasBin: true
 
+  '@github/copilot-win32-x64@1.0.44':
+    resolution: {integrity: sha512-Yj3KQ/DqwS50PwRtyQITX2mWIVZeJeX+y0faVSMwUUzG1qxmMcme7wimhKOyc4LSV11DpgVB9MSiBw2xys7iww==}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
+
   '@github/copilot@1.0.17':
     resolution: {integrity: sha512-RTJ+kEKOdidjuOs8ozsoBdz+94g7tFJIEu5kz1P2iwJhsL+iIA5rtn9/jXOF0hAI3CLSXKZoSd66cqHrn4rb1A==}
+    hasBin: true
+
+  '@github/copilot@1.0.44':
+    resolution: {integrity: sha512-wr/GmNOUaJK/giJK5abyB1oTpEowgFKLi+NJnlyAymKiK/GKCaRlJqiX23H2RetM8vD2hDYUFUFm9lTCooGy0g==}
     hasBin: true
 
   '@grpc/grpc-js@1.13.4':
@@ -12886,9 +12933,6 @@ packages:
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
 
-  nan@2.26.2:
-    resolution: {integrity: sha512-0tTvBTYkt3tdGw22nrAy50x7gpbGCCFH3AFcyS5WiUu7Eu4vWlri1woE6qHBSfy11vksDqkiwjOnlR7WV8G1Hw==}
-
   nanoid@3.3.11:
     resolution: {integrity: sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -14980,9 +15024,6 @@ packages:
   user-home@2.0.0:
     resolution: {integrity: sha512-KMWqdlOcjCYdtIJpicDSFBQ8nFwS2i9sslAd6f4+CBGcU4gist2REnr2fxj2YocvJFxSF3ZOHLYLVZnUxv4BZQ==}
     engines: {node: '>=0.10.0'}
-
-  usocket@0.3.0:
-    resolution: {integrity: sha512-V/H02RNiaOCJZuPoKont/y12VJaImC6C5xW7OzPFjYu9qnig0yv9hyp9E7Wqjm6d8yZuZouH3NAfDATVMgh2SQ==}
 
   utf8-byte-length@1.0.4:
     resolution: {integrity: sha512-4+wkEYLBbWxqTahEsWrhxepcoVOJ+1z5PGIjPZxRkytcdSUaNjIjBM7Xn8E+pdSuV7SzvWovBFA54FO0JSoqhA==}
@@ -17697,13 +17738,25 @@ snapshots:
   '@github/copilot-darwin-arm64@1.0.17':
     optional: true
 
+  '@github/copilot-darwin-arm64@1.0.44':
+    optional: true
+
   '@github/copilot-darwin-x64@1.0.17':
+    optional: true
+
+  '@github/copilot-darwin-x64@1.0.44':
     optional: true
 
   '@github/copilot-linux-arm64@1.0.17':
     optional: true
 
+  '@github/copilot-linux-arm64@1.0.44':
+    optional: true
+
   '@github/copilot-linux-x64@1.0.17':
+    optional: true
+
+  '@github/copilot-linux-x64@1.0.44':
     optional: true
 
   '@github/copilot-sdk@0.2.0':
@@ -17712,10 +17765,22 @@ snapshots:
       vscode-jsonrpc: 8.2.1
       zod: 4.3.6
 
+  '@github/copilot-sdk@0.3.0':
+    dependencies:
+      '@github/copilot': 1.0.44
+      vscode-jsonrpc: 8.2.1
+      zod: 4.3.6
+
   '@github/copilot-win32-arm64@1.0.17':
     optional: true
 
+  '@github/copilot-win32-arm64@1.0.44':
+    optional: true
+
   '@github/copilot-win32-x64@1.0.17':
+    optional: true
+
+  '@github/copilot-win32-x64@1.0.44':
     optional: true
 
   '@github/copilot@1.0.17':
@@ -17726,6 +17791,15 @@ snapshots:
       '@github/copilot-linux-x64': 1.0.17
       '@github/copilot-win32-arm64': 1.0.17
       '@github/copilot-win32-x64': 1.0.17
+
+  '@github/copilot@1.0.44':
+    optionalDependencies:
+      '@github/copilot-darwin-arm64': 1.0.44
+      '@github/copilot-darwin-x64': 1.0.44
+      '@github/copilot-linux-arm64': 1.0.44
+      '@github/copilot-linux-x64': 1.0.44
+      '@github/copilot-win32-arm64': 1.0.44
+      '@github/copilot-win32-x64': 1.0.44
 
   '@grpc/grpc-js@1.13.4':
     dependencies:
@@ -22230,10 +22304,7 @@ snapshots:
       jsbi: 2.0.5
       long: 4.0.0
       safe-buffer: 5.2.1
-      usocket: 0.3.0
       xml2js: 0.4.23
-    transitivePeerDependencies:
-      - supports-color
 
   debug@2.6.9:
     dependencies:
@@ -25923,8 +25994,6 @@ snapshots:
       object-assign: 4.1.1
       thenify-all: 1.6.0
 
-  nan@2.26.2: {}
-
   nanoid@3.3.11: {}
 
   nanoid@5.1.5: {}
@@ -28446,14 +28515,6 @@ snapshots:
   user-home@2.0.0:
     dependencies:
       os-homedir: 1.0.2
-
-  usocket@0.3.0:
-    dependencies:
-      bindings: 1.5.0
-      nan: 2.26.2
-      node-gyp: 12.2.0
-    transitivePeerDependencies:
-      - supports-color
 
   utf8-byte-length@1.0.4: {}
 

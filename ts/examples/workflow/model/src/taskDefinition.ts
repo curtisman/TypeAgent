@@ -34,6 +34,16 @@ export interface TaskContext {
      * Task implementations should check these to enforce caller restrictions.
      */
     constraints?: TaskConstraints;
+
+    /**
+     * The dispatching node's declared output schema. Tasks may use it to shape
+     * their computation (e.g. schema-guided LLM responses, per copilot.invoke).
+     *
+     * NOTE: The engine always validates the task's return value against the
+     *       output schema after execution. Tasks normally do not need to do this,
+     *       unless the task uses the results internally.
+     */
+    outputSchema: JSONSchema;
 }
 
 /**
