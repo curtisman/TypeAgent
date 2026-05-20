@@ -4996,7 +4996,8 @@ describe("WorkflowEngine (IR v1)", () => {
                         nodeId: "test",
                         scopePath: [],
                         signal: new AbortController().signal,
-                    },
+                        outputSchema: { type: "object" },
+                    } as any,
                 );
                 expect(result.kind).toBe("fail");
                 if (result.kind === "fail") {
